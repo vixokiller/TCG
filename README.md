@@ -28,12 +28,15 @@ Juego de cartas coleccionables para navegador, en español, inspirado en dinámi
 - Las Armas anexadas se muestran parcialmente debajo del Aliado portador.
 - El Mazo Castillo solo muestra cuántas cartas quedan; al hacer clic no revela su contenido.
 - Al hacer clic en Cementerio, Destierro, Reserva de Oros u Oros pagados se abre un visor con sus cartas.
-- Al declarar bloqueos se muestra una conexión visual entre el Aliado bloqueador y el Aliado atacante bloqueado.
-- Al poner el mouse sobre una carta, aparece una vista grande con nombre, coste, fuerza, raza y habilidad en español.
+- Al declarar bloqueos se muestra una conexión visual dentro del campo entre el Aliado bloqueador y el Aliado atacante bloqueado.
+- La perspectiva de la mesa siempre se mantiene desde el jugador: el Rival arriba y el Jugador abajo, incluso durante el turno del rival.
+- En el turno del Rival no se muestra la mano rival; solo se detiene en Declaración de Bloqueadores para que el jugador seleccione sus bloqueos.
+- Al mantener el mouse sobre una carta por 2 segundos, aparece al lado izquierdo una vista grande con nombre, coste, fuerza, raza y habilidad en español.
+- Hay una pestaña Constructor con enciclopedia de cartas, creación de cartas, mazos prediseñados y mazos de usuario seleccionables para jugar.
 
 ## Cómo jugar
 
-1. Abre `index.html` desde un servidor estático.
+1. Abre `index.html` desde un servidor estático. Usa la pestaña Constructor para seleccionar un mazo prediseñado o crear uno propio.
 2. En Vigilia, juega cartas desde la mano; los Aliados entran a Línea de Defensa.
 3. Haz clic en un Aliado de tu Línea de Defensa durante Vigilia para moverlo a Línea de Ataque si puede atacar.
 4. En Declaración de Bloqueadores, incluso durante el turno del rival, selecciona un Aliado en Línea de Defensa y luego un Aliado oponente en Línea de Ataque para bloquearlo.
