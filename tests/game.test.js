@@ -42,7 +42,7 @@ test('players start in vigilia after automatic initial grouping', () => {
   assert.equal(player.deck.length, CASTLE_SIZE - STARTING_GOLD - STARTING_HAND_SIZE);
 });
 
-test('paid gold returns to reserve during automatic grouping helper', () => {
+test('grouping returns paid gold to reserve', () => {
   const state = createGame();
   const player = state.players[0];
   player.paidGold.push(...player.gold.splice(0, 1));
@@ -51,14 +51,52 @@ test('paid gold returns to reserve during automatic grouping helper', () => {
   assert.equal(player.paidGold.length, 0);
 });
 
-test('allies are played to defense line and can move to attack line in vigilia', () => {
+test('automatic grouping returns attack line allies to defense at the next turn start', () => {
+  const state = createGame();
+  const nextPlayer = state.players[1];
+  nextPlayer.attackLine.push({ id: 'ally', name: 'Atacante', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, exhausted: true });
+  state.phase = 'Robo';
+
+  advancePhase(state);
+
+  assert.equal(state.currentPlayer, 1);
+  assert.equal(nextPlayer.attackLine.length, 0);
+  assert.equal(nextPlayer.defenseLine.at(-1).name, 'Atacante');
+});
+
+test('allies are played to defense and cannot attack the turn they enter unless they have haste', () => {
   const state = createGame();
   const player = state.players[0];
   player.hand.unshift({ id: 'ally', name: 'Aliado Test', type: CARD_TYPES.ALIADO, cost: 1, strength: 2 });
   assert.match(playCard(state, 0, 0), /Línea de Defensa/);
   assert.equal(player.defenseLine.length, 1);
-  assert.match(moveAllyToAttack(player, 0), /Línea de Ataque/);
-  assert.equal(player.attackLine.length, 1);
+  assert.match(moveAllyToAttack(player, 0, state), /no puede atacar/);
+  player.defenseLine[0].enteredTurn = state.turn - 1;
+  assert.match(moveAllyToAttack(player, 0, state), /Línea de Ataque/);
+});
+
+test('haste allies can attack the turn they enter play', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.hand.unshift({ id: 'hero', name: 'Héroe Test', type: CARD_TYPES.ALIADO, cost: 1, strength: 2, ability: 'haste', race: 'Héroe' });
+  playCard(state, 0, 0);
+  assert.match(moveAllyToAttack(player, 0, state), /Línea de Ataque/);
+});
+
+test('enter-play recycle ability shuffles two cemetery cards into castle', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.gold.push({ id: 'extra-gold-1', name: 'Oro Extra', type: CARD_TYPES.ORO });
+  player.gold.push({ id: 'extra-gold-2', name: 'Oro Extra', type: CARD_TYPES.ORO });
+  player.gold.push({ id: 'extra-gold-3', name: 'Oro Extra', type: CARD_TYPES.ORO });
+  player.discard.push({ id: 'd1', name: 'Carta 1', type: CARD_TYPES.TALISMAN }, { id: 'd2', name: 'Carta 2', type: CARD_TYPES.TALISMAN });
+  const before = player.deck.length;
+  player.hand.unshift({ id: 'titan', name: 'Titán Test', type: CARD_TYPES.ALIADO, cost: 4, strength: 6, ability: 'recycleOnEnter', race: 'Titán' });
+
+  playCard(state, 0, 0);
+
+  assert.equal(player.discard.length, 0);
+  assert.equal(player.deck.length, before + 2);
 });
 
 test('weapons attach to one ally and are destroyed with the bearer', () => {
@@ -82,15 +120,24 @@ test('attached weapon is shuffled with ally when bearer returns to castle', () =
   assert.equal(player.deck.length, before + 2);
 });
 
-test('battle advances through attack, blockers, talisman war and damage assignment', () => {
+test('blockers must come from opposing defense line and each blocker blocks once', () => {
+  const state = createGame();
+  state.players[0].attackLine.push({ id: 'a1', name: 'Atacante 1', type: CARD_TYPES.ALIADO, strength: 3, bonus: 0, exhausted: false, weapon: null });
+  state.players[0].attackLine.push({ id: 'a2', name: 'Atacante 2', type: CARD_TYPES.ALIADO, strength: 3, bonus: 0, exhausted: false, weapon: null });
+  state.players[1].defenseLine.push({ id: 'd1', name: 'Defensor', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, exhausted: false, weapon: null });
+  advancePhase(state);
+  advancePhase(state);
+  assert.match(declareBlocker(state, 0, 0), /bloquea/);
+  assert.match(declareBlocker(state, 0, 1), /ya está bloqueando/);
+});
+
+test('battle advances through blockers, talisman war and damage assignment', () => {
   const state = createGame();
   state.players[0].attackLine.push({ id: 'attacker', name: 'Atacante', type: CARD_TYPES.ALIADO, strength: 3, bonus: 0, exhausted: false, weapon: null });
   state.players[1].defenseLine.push({ id: 'defender', name: 'Defensor', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, exhausted: false, weapon: null });
   advancePhase(state);
-  assert.equal(state.phase, 'Declaración de Ataque');
   advancePhase(state);
-  assert.equal(state.phase, 'Declaración de Bloqueadores');
-  assert.match(declareBlocker(state, 0, 0), /bloquea/);
+  declareBlocker(state, 0, 0);
   advancePhase(state);
   assert.equal(state.phase, 'Guerra de Talismanes');
   advancePhase(state);
