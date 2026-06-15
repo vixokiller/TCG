@@ -20,6 +20,14 @@ export const DECK_COMPOSITION = {
 
 const makeCard = (id, name, type, cost = 0, strength = 0, text = '', ability = null, race = null) => ({ id, name, type, cost, strength, text, ability, race });
 const clone = (card, id) => ({ ...card, id });
+const abilityLabels = {
+  raceGuardian: 'Guardia de raza: Aliados de la misma raza en defensa obtienen +1.',
+  drawOnEnter: 'Entrada: roba 1 carta.',
+  banishOnHit: 'Impacto: si no es bloqueado, destierra 1 carta adicional.',
+  haste: 'Ímpetu: puede atacar el turno que entra en juego.',
+  recycleOnEnter: 'Entrada: baraja 2 cartas de tu Cementerio en tu Mazo Castillo.',
+};
+function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.ability : 'Sin habilidad.'; }
 
 export const cardPool = [
   makeCard('oro-canelo', 'Oro de Canelo', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
@@ -306,7 +314,7 @@ export function createGame() {
 function renderCard(card, index, zone, onClick) {
   const button = document.createElement('button');
   button.className = `card ${card.type.toLowerCase()} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''}`;
-  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}<strong>${card.name}</strong><span>${card.type}${card.race ? ` · ${card.race}` : ''}${card.cost ? ` · Coste ${card.cost}` : ''}</span><p>${card.strength ? `Fuerza ${card.strength + (card.bonus || 0) + weaponBonus(card)}` : card.text}</p><small>${card.ability ? `Habilidad: ${card.ability}` : ''}</small>`;
+  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}<strong>${card.name}</strong><span>${card.type}${card.race ? ` · ${card.race}` : ''}${card.cost ? ` · Coste ${card.cost}` : ''}</span><p>${card.strength ? `Fuerza ${card.strength + (card.bonus || 0) + weaponBonus(card)}` : card.text}</p><small>${abilityText(card)}</small><div class="card-detail"><h3>${card.name}</h3><p>Tipo: ${card.type}</p><p>Coste: ${card.cost || 0}</p><p>Fuerza: ${card.strength || 0}${card.weapon ? ` (+${card.weapon.strength} por Arma)` : ''}</p><p>Raza: ${card.race || '—'}</p><p>Habilidad: ${abilityText(card)}</p></div>`;
   button.title = zone;
   button.disabled = zone.includes('mazo') || zone.includes('cementerio') || zone.includes('destierro') || zone.includes('oro');
   button.addEventListener('click', () => onClick(index));
@@ -314,10 +322,29 @@ function renderCard(card, index, zone, onClick) {
 }
 
 function renderZone(selector, cards, zone, onClick) { const element = document.querySelector(selector); cards.forEach((card, index) => element.appendChild(renderCard(card, index, zone, onClick))); }
-function zoneSummary(title, cards, key) { return `<button class="zone-card" data-zone="${key}"><h3>${title}</h3><p>${cards.length} carta${cards.length === 1 ? '' : 's'}</p></button>`; }
+function zoneSummary(title, cards, key) {
+  const isDeck = key.endsWith(':deck');
+  const tag = isDeck ? 'article' : 'button';
+  const data = isDeck ? '' : ` data-zone="${key}"`;
+  return `<${tag} class="zone-card ${isDeck ? 'locked-zone' : ''}"${data}><h3>${title}</h3><p>${cards.length} carta${cards.length === 1 ? '' : 's'}</p>${isDeck ? '<small>Contenido oculto</small>' : ''}</${tag}>`;
+}
 function renderSideZones(player, prefix) { return `<aside class="side-zones"><div class="top-pile">${zoneSummary('Cementerio', player.discard, `${prefix}:discard`)}${zoneSummary('Oros pagados', player.paidGold, `${prefix}:paidGold`)}</div><div class="middle-pile">${zoneSummary('Mazo Castillo', player.deck, `${prefix}:deck`)}</div><div class="bottom-pile">${zoneSummary('Destierro', player.banished, `${prefix}:banished`)}${zoneSummary('Reserva de Oros', player.gold, `${prefix}:gold`)}</div></aside>`; }
 function renderLines(prefix) { return `<section class="lines"><h3>Línea de Ataque</h3><div id="${prefix}Attack" class="zone compact"></div><h3>Línea de Defensa</h3><div id="${prefix}Defense" class="zone compact"></div><h3>Línea de Apoyo</h3><div id="${prefix}Support" class="zone compact"></div></section>`; }
 
+
+
+function renderBattleLinks(state, active, opponent) {
+  if (!state.pendingAttacks?.length) return '';
+  const rows = state.pendingAttacks
+    .filter((attack) => attack.blockerIndex !== null)
+    .map((attack) => {
+      const attacker = active.attackLine[attack.attackerIndex];
+      const blocker = opponent.defenseLine[attack.blockerIndex];
+      if (!attacker || !blocker) return '';
+      return `<div class="block-link"><span>${blocker.name}</span><i></i><span>${attacker.name}</span></div>`;
+    }).join('');
+  return rows ? `<section class="block-links"><h2>Bloqueos declarados</h2>${rows}</section>` : '';
+}
 
 function renderViewedZone(state, active, opponent) {
   if (!state.viewedZone) return '';
@@ -332,7 +359,7 @@ function render(state) {
   const active = state.players[state.currentPlayer];
   const opponent = state.players[1 - state.currentPlayer];
   const status = state.winner ? `<section class="result"><h2>${state.winner} gana</h2><p>${state.loser} perdió por quedarse sin cartas en su Castillo.</p></section>` : '';
-  app.innerHTML = `<main class="shell"><header><div><p class="eyebrow">Turno ${state.turn} · ${active.name}</p><h1>Crónicas del Austral</h1><p class="phase">Fase actual: <b>${state.phase}</b></p></div><button id="nextPhase" ${state.winner ? 'disabled' : ''}>Siguiente paso</button></header>${status}<section class="rules"><h2>Batalla Mitológica</h2><ol>${PHASES.map((phase) => `<li class="${phase === state.phase ? 'active-phase' : ''}">${phase}</li>`).join('')}</ol></section><section class="table"><div class="player-board opponent-board">${renderSideZones(opponent, 'opponent')}${renderLines('opponent')}</div><div class="player-board">${renderSideZones(active, 'active')}${renderLines('active')}</div></section><h2>Mano</h2><div id="hand" class="zone"></div>${renderViewedZone(state, active, opponent)}<aside><h2>Bitácora</h2><ul>${state.log.slice(-12).map((entry) => `<li>${entry}</li>`).join('')}</ul></aside></main>`;
+  app.innerHTML = `<main class="shell"><header><div><p class="eyebrow">Turno ${state.turn} · ${active.name}</p><h1>Crónicas del Austral</h1><p class="phase">Fase actual: <b>${state.phase}</b></p></div><button id="nextPhase" ${state.winner ? 'disabled' : ''}>Siguiente paso</button></header>${status}<section class="rules"><h2>Batalla Mitológica</h2><ol>${PHASES.map((phase) => `<li class="${phase === state.phase ? 'active-phase' : ''}">${phase}</li>`).join('')}</ol></section><section class="table"><div class="player-board opponent-board">${renderSideZones(opponent, 'opponent')}${renderLines('opponent')}</div><div class="player-board">${renderSideZones(active, 'active')}${renderLines('active')}</div></section>${renderBattleLinks(state, active, opponent)}<h2>Mano</h2><div id="hand" class="zone"></div>${renderViewedZone(state, active, opponent)}<aside><h2>Bitácora</h2><ul>${state.log.slice(-12).map((entry) => `<li>${entry}</li>`).join('')}</ul></aside></main>`;
   document.querySelector('#nextPhase').addEventListener('click', () => { advancePhase(state); autoPlayIfNeeded(state); render(state); });
   document.querySelectorAll('.zone-card').forEach((button) => button.addEventListener('click', () => { state.viewedZone = button.dataset.zone; render(state); }));
   document.querySelector('#closeViewer')?.addEventListener('click', () => { state.viewedZone = null; render(state); });
@@ -340,7 +367,7 @@ function render(state) {
   renderZone('#opponentAttack', opponent.attackLine, 'ataque oponente', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } });
   renderZone('#opponentDefense', opponent.defenseLine, 'defensa oponente', (i) => { if (state.phase === 'Declaración de Bloqueadores') { state.selectedBlockerIndex = i; state.log.push(`${opponent.defenseLine[i].name} seleccionado para bloquear.`); render(state); } });
   renderZone('#opponentSupport', opponent.supportLine, 'apoyo oponente', () => {});
-  renderZone('#activeAttack', active.attackLine, 'ataque', () => {});
+  renderZone('#activeAttack', active.attackLine, 'ataque', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } });
   renderZone('#activeDefense', active.defenseLine, 'defensa', (i) => { if (state.phase === 'Vigilia') state.log.push(moveAllyToAttack(active, i, state)); render(state); });
   renderZone('#activeSupport', active.supportLine, 'apoyo', () => {});
   renderZone('#hand', active.hand, 'mano', (i) => { state.log.push(playCard(state, state.currentPlayer, i)); render(state); });
@@ -362,9 +389,8 @@ function autoPlayIfNeeded(state) {
       if (rival.defenseLine.length) state.log.push(moveAllyToAttack(rival, 0, state));
       advancePhase(state);
     } else if (state.phase === 'Declaración de Bloqueadores') {
-      const blockable = state.pendingAttacks.find((attack) => attack.blockerIndex === null);
-      if (blockable && rival.defenseLine[0]) state.log.push(declareBlocker(state, 0, blockable.attackerIndex));
-      advancePhase(state);
+      state.log.push('Declara tus bloqueadores contra el Rival y luego presiona Siguiente paso.');
+      return;
     } else if (state.phase === 'Guerra de Talismanes') {
       passTalismanPriority(state); passTalismanPriority(state);
     } else {

@@ -26,15 +26,17 @@ Juego de cartas coleccionables para navegador, en español, inspirado en dinámi
 - A la izquierda están las zonas de recursos y descarte: Oros pagados arriba, Mazo Castillo al centro, Reserva de Oros abajo, Cementerio junto al Castillo y Destierro bajo el Cementerio.
 - En el campo, la Línea de Ataque está arriba, la Línea de Defensa al medio y la Línea de Apoyo abajo.
 - Las Armas anexadas se muestran parcialmente debajo del Aliado portador.
+- El Mazo Castillo solo muestra cuántas cartas quedan; al hacer clic no revela su contenido.
 - Al hacer clic en Cementerio, Destierro, Reserva de Oros u Oros pagados se abre un visor con sus cartas.
-- Al poner el mouse sobre una carta, esta crece para mostrar mejor sus características.
+- Al declarar bloqueos se muestra una conexión visual entre el Aliado bloqueador y el Aliado atacante bloqueado.
+- Al poner el mouse sobre una carta, aparece una vista grande con nombre, coste, fuerza, raza y habilidad en español.
 
 ## Cómo jugar
 
 1. Abre `index.html` desde un servidor estático.
 2. En Vigilia, juega cartas desde la mano; los Aliados entran a Línea de Defensa.
 3. Haz clic en un Aliado de tu Línea de Defensa durante Vigilia para moverlo a Línea de Ataque si puede atacar.
-4. En Declaración de Bloqueadores, selecciona un Aliado en Línea de Defensa y luego un Aliado oponente en Línea de Ataque para bloquearlo.
+4. En Declaración de Bloqueadores, incluso durante el turno del rival, selecciona un Aliado en Línea de Defensa y luego un Aliado oponente en Línea de Ataque para bloquearlo.
 5. Haz clic en Cementerio, Destierro, Reserva de Oros u Oros pagados para ver las cartas de esa zona.
 6. Avanza a Batalla Mitológica para declarar ataques, bloqueadores, Guerra de Talismanes y daño.
 7. Gana quien deje vacío el Castillo del oponente.
