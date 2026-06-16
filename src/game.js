@@ -27,7 +27,36 @@ const abilityLabels = {
   haste: 'Ímpetu: puede atacar el turno que entra en juego.',
   recycleOnEnter: 'Entrada: baraja 2 cartas de tu Cementerio en tu Mazo Castillo.',
 };
-function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.ability : 'Sin habilidad.'; }
+function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.ability : (card.text || 'Sin habilidad.'); }
+function shuffleDeck(cards) {
+  const shuffled = [...cards];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+function balancedShuffle(cards) {
+  const gold = shuffleDeck(cards.filter((card) => card.type === CARD_TYPES.ORO));
+  const other = shuffleDeck(cards.filter((card) => card.type !== CARD_TYPES.ORO));
+  const result = [];
+  const interval = Math.max(2, Math.round(cards.length / Math.max(1, gold.length)));
+  while (other.length || gold.length) {
+    for (let i = 0; i < interval - 1 && other.length; i += 1) result.push(other.pop());
+    if (gold.length) result.push(gold.pop());
+  }
+  return result;
+}
+function loadSavedLibrary() {
+  if (typeof localStorage === 'undefined') return { customCards: [], userDecks: [] };
+  try { return JSON.parse(localStorage.getItem('austral-tcg-library')) || { customCards: [], userDecks: [] }; } catch { return { customCards: [], userDecks: [] }; }
+}
+function saveLibrary(state) {
+  if (typeof localStorage === 'undefined') return;
+  const customCards = state.cardCatalog.filter((card) => card.custom);
+  const userDecks = state.decks.filter((deck) => deck.source === 'user');
+  localStorage.setItem('austral-tcg-library', JSON.stringify({ customCards, userDecks }));
+}
 
 export const cardPool = [
   makeCard('oro-canelo', 'Oro de Canelo', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
@@ -47,7 +76,7 @@ export const cardPool = [
 
 export function buildDeck() {
   const recipe = [[0, 5], [1, 5], [2, 5], [3, 6], [4, 6], [5, 5], [6, 5], [7, 3], [8, 2], [9, 2], [10, 2], [11, 2], [12, 2]];
-  return recipe.flatMap(([poolIndex, amount]) => Array.from({ length: amount }, (_, i) => clone(cardPool[poolIndex], `${cardPool[poolIndex].id}-${i}`))).sort(() => Math.random() - 0.5);
+  return balancedShuffle(recipe.flatMap(([poolIndex, amount]) => Array.from({ length: amount }, (_, i) => clone(cardPool[poolIndex], `${cardPool[poolIndex].id}-${i}`))));
 }
 
 export function countByType(deck) {
@@ -118,8 +147,7 @@ export function shuffleAllyIntoCastle(player, line, index) {
   if (!ally) return;
   const cards = [{ ...ally, weapon: undefined }];
   if (ally.weapon) cards.push(ally.weapon);
-  player.deck.push(...cards);
-  player.deck.sort(() => Math.random() - 0.5);
+  player.deck = shuffleDeck([...player.deck, ...cards]);
 }
 
 export function returnAllyToHand(player, line, index) {
@@ -173,7 +201,7 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   if (card.type === CARD_TYPES.ALIADO) {
     player.defenseLine.push({ ...card, exhausted: false, bonus: 0, weapon: null, enteredTurn: state.turn });
     if (card.ability === 'drawOnEnter') draw(player, 1);
-    if (card.ability === 'recycleOnEnter') player.deck.push(...player.discard.splice(0, 2));
+    if (card.ability === 'recycleOnEnter') player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, 2)]);
     return `${player.name} invocó a ${card.name} en Línea de Defensa.`;
   }
   if (card.type === CARD_TYPES.TOTEM) {
@@ -316,15 +344,21 @@ export function advancePhase(state) {
 }
 
 export function createGame() {
-  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool], decks: [{ id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' }], selectedDeckId: 'base' };
+  const saved = loadSavedLibrary();
+  const baseDeck = { id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' };
+  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base' };
   automaticGrouping(state);
   return state;
 }
 
 function renderCard(card, index, zone, onClick, state = null) {
   const button = document.createElement('button');
+  const effectiveStrength = card.effectiveStrength ?? (card.strength + (card.bonus || 0) + weaponBonus(card));
+  const delta = effectiveStrength - (card.strength || 0);
+  const strengthHtml = card.strength ? `Fuerza <b>${card.strength}</b>${delta ? ` <b class="${delta > 0 ? 'buff' : 'debuff'}">${delta > 0 ? '+' : ''}${delta}</b>` : ''}` : abilityText(card);
+  const imageHtml = card.imageUrl ? `<img class="card-art" src="${card.imageUrl}" alt="${card.name}">` : '';
   button.className = `card ${card.type.toLowerCase()} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''}`;
-  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}<strong>${card.name}</strong><span>${card.type}${card.race ? ` · ${card.race}` : ''}${card.cost ? ` · Coste ${card.cost}` : ''}</span><p>${card.strength ? `Fuerza ${card.strength + (card.bonus || 0) + weaponBonus(card)}` : card.text}</p><small>${abilityText(card)}</small>`;
+  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}<strong>${card.name}</strong><span>${card.type}${card.race ? ` · ${card.race}` : ''}${card.cost ? ` · Coste ${card.cost}` : ''}</span><p>${strengthHtml}</p>${card.strength ? `<small>${abilityText(card)}</small>` : ''}`;
   button.title = zone;
   button.disabled = zone.includes('mazo') || zone.includes('cementerio') || zone.includes('destierro') || zone.includes('oro');
   if (zone === 'defensa' || zone === 'ataque') {
@@ -378,7 +412,7 @@ function renderViewedZone(state, active, opponent) {
 function selectedDeck(state) { return state.decks.find((deck) => deck.id === state.selectedDeckId); }
 function renderDeckBuilder(state) {
   const deck = selectedDeck(state);
-  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><div id="deckCards" class="zone compact"></div></article></section></main>`;
+  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><div id="deckCards" class="zone compact"></div></article></section></main>`;
 }
 function wireDeckBuilder(state) {
   document.querySelector('#tabGame')?.addEventListener('click', () => { state.currentTab = 'game'; render(state); });
@@ -392,16 +426,16 @@ function wireDeckBuilder(state) {
   });
   document.querySelector('#newDeck')?.addEventListener('click', () => {
     const deck = { id: `user-${Date.now()}`, name: `Mazo usuario ${state.decks.length}`, cards: [], source: 'user' };
-    state.decks.push(deck); state.selectedDeckId = deck.id; render(state);
+    state.decks.push(deck); state.selectedDeckId = deck.id; saveLibrary(state); render(state);
   });
-  renderZone('#catalog', state.cardCatalog, 'catalogo', (i) => { selectedDeck(state)?.cards.push({ ...state.cardCatalog[i], id: `${state.cardCatalog[i].id}-deck-${Date.now()}` }); render(state); });
+  renderZone('#catalog', state.cardCatalog, 'catalogo', (i) => { selectedDeck(state)?.cards.push({ ...state.cardCatalog[i], id: `${state.cardCatalog[i].id}-deck-${Date.now()}` }); saveLibrary(state); render(state); });
   renderZone('#deckCards', selectedDeck(state)?.cards || [], 'mazo usuario', () => {});
   document.querySelector('#cardForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = data.get('type');
-    const card = makeCard(`custom-${Date.now()}`, data.get('name'), type, Number(data.get('cost')), Number(data.get('strength')), data.get('text'), null, data.get('race') || null);
-    state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); render(state);
+    const card = { ...makeCard(`custom-${Date.now()}`, data.get('name'), type, Number(data.get('cost')), Number(data.get('strength')), data.get('text'), null, data.get('race') || null), imageUrl: data.get('imageUrl') || '', custom: true };
+    state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); saveLibrary(state); render(state);
   });
 }
 
@@ -409,7 +443,7 @@ function wireDeckBuilder(state) {
 function renderPreviewPanel(state) {
   const card = state.previewCard;
   if (!card) return '';
-  return `<aside class="card-info-window"><h2>${card.name}</h2><p><b>Tipo:</b> ${card.type}</p><p><b>Coste:</b> ${card.cost || 0}</p><p><b>Fuerza:</b> ${card.strength || 0}</p><p><b>Raza:</b> ${card.race || '—'}</p><p><b>Habilidad:</b> ${abilityText(card)}</p><p>${card.text || ''}</p></aside>`;
+  return `<aside class="card-info-window">${card.imageUrl ? `<img class="info-art" src="${card.imageUrl}" alt="${card.name}">` : ''}<h2>${card.name}</h2><p><b>Tipo:</b> ${card.type}</p><p><b>Coste:</b> ${card.cost || 0}</p><p><b>Fuerza:</b> ${card.effectiveStrength ?? card.strength ?? 0}</p><p><b>Raza:</b> ${card.race || '—'}</p><p><b>Habilidad:</b> ${abilityText(card)}</p></aside>`;
 }
 
 function render(state) {
@@ -430,11 +464,11 @@ function render(state) {
   document.querySelectorAll('.zone-card').forEach((button) => button.addEventListener('click', () => { state.viewedZone = button.dataset.zone; render(state); }));
   document.querySelector('#closeViewer')?.addEventListener('click', () => { state.viewedZone = null; render(state); });
   if (state.viewedZone) { const [owner, zone] = state.viewedZone.split(':'); const cards = (owner === 'player' ? player : rival)[zone] || []; renderZone('#viewerCards', cards, 'visor', () => {}, state); }
-  renderZone('#rivalAttack', rival.attackLine, 'ataque rival', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } }, state);
-  renderZone('#rivalDefense', rival.defenseLine, 'defensa rival', (i) => { if (state.phase === 'Declaración de Bloqueadores') { state.selectedBlockerIndex = i; state.log.push(`${rival.defenseLine[i].name} seleccionado para bloquear.`); render(state); } }, state);
+  renderZone('#rivalAttack', rival.attackLine.map((card) => ({ ...card, effectiveStrength: totalStrength(rival, card, 'attackLine') })), 'ataque rival', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } }, state);
+  renderZone('#rivalDefense', rival.defenseLine.map((card) => ({ ...card, effectiveStrength: totalStrength(rival, card, 'defenseLine') })), 'defensa rival', (i) => { if (state.phase === 'Declaración de Bloqueadores') { state.selectedBlockerIndex = i; state.log.push(`${rival.defenseLine[i].name} seleccionado para bloquear.`); render(state); } }, state);
   renderZone('#rivalSupport', rival.supportLine, 'apoyo rival', () => {}, state);
-  renderZone('#playerAttack', player.attackLine, 'ataque', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } }, state);
-  renderZone('#playerDefense', player.defenseLine, 'defensa', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.currentPlayer === 1) { state.selectedBlockerIndex = i; state.log.push(`${player.defenseLine[i].name} seleccionado para bloquear.`); render(state); return; } if (state.currentPlayer === 0 && state.phase === 'Vigilia') state.log.push(moveAllyToAttack(player, i, state)); render(state); }, state);
+  renderZone('#playerAttack', player.attackLine.map((card) => ({ ...card, effectiveStrength: totalStrength(player, card, 'attackLine') })), 'ataque', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); } }, state);
+  renderZone('#playerDefense', player.defenseLine.map((card) => ({ ...card, effectiveStrength: totalStrength(player, card, 'defenseLine') })), 'defensa', (i) => { if (state.phase === 'Declaración de Bloqueadores' && state.currentPlayer === 1) { state.selectedBlockerIndex = i; state.log.push(`${player.defenseLine[i].name} seleccionado para bloquear.`); render(state); return; } if (state.currentPlayer === 0 && state.phase === 'Vigilia') state.log.push(moveAllyToAttack(player, i, state)); render(state); }, state);
   renderZone('#playerSupport', player.supportLine, 'apoyo', () => {}, state);
   document.querySelector('#playerAttack').addEventListener('dragover', (event) => event.preventDefault());
   document.querySelector('#playerAttack').addEventListener('drop', (event) => { event.preventDefault(); if (state.draggingAlly?.line === 'defenseLine') state.log.push(moveAllyToAttack(player, state.draggingAlly.index, state)); state.draggingAlly = null; render(state); });

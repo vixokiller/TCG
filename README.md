@@ -31,8 +31,8 @@ Juego de cartas coleccionables para navegador, en español, inspirado en dinámi
 - Al declarar bloqueos se muestra una línea dentro del tablero que parte del Aliado bloqueador hacia el Aliado atacante bloqueado.
 - La perspectiva de la mesa siempre se mantiene desde el jugador: el Rival arriba y el Jugador abajo, incluso durante el turno del rival.
 - En el turno del Rival no se muestra la mano rival; solo se detiene en Declaración de Bloqueadores para que el jugador seleccione sus bloqueos.
-- Al mantener el mouse sobre una carta por 2 segundos, aparece al lado izquierdo de la pantalla una ventana de información con nombre, coste, fuerza, raza y habilidad en español.
-- Hay una pestaña Constructor con enciclopedia de cartas, creación de cartas, mazos prediseñados y mazos de usuario seleccionables para jugar.
+- Al mantener el mouse sobre una carta por 2 segundos, aparece al lado izquierdo de la pantalla una ventana de información con nombre, coste, fuerza, raza y habilidad en español. Las habilidades se muestran una sola vez y los bonos de fuerza aparecen en verde; las reducciones aparecen en rojo.
+- Hay una pestaña Constructor con enciclopedia de cartas, creación de cartas, URL opcional de imagen, mazos prediseñados y mazos de usuario seleccionables para jugar. Las cartas y mazos de usuario se guardan en `localStorage` del navegador.
 
 ## Cómo jugar
 
@@ -52,3 +52,10 @@ npm start
 ```
 
 `npm start` levanta un servidor estático en el puerto 4173 usando Python, sin dependencias externas.
+
+
+## Personalización persistente
+
+- Para agregar Aliados persistentes desde la interfaz, entra a **Constructor**, completa el formulario de Crear carta, elige tipo `Aliado`, agrega raza, fuerza, coste, texto/habilidad y opcionalmente una URL de imagen. La carta se guarda en `localStorage` junto con los mazos de usuario.
+- Para agregar cartas base desde código, edita `cardPool` en `src/game.js` y usa `makeCard(id, nombre, CARD_TYPES.ALIADO, coste, fuerza, texto, habilidad, raza)`.
+- Para reemplazar la imagen de una carta, agrega la propiedad `imageUrl` a la carta o usa el campo “URL de imagen opcional” del Constructor. Puede ser una URL web o una ruta local servida por el proyecto, por ejemplo `/assets/mi-carta.png`.

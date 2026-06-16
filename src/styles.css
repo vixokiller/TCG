@@ -80,3 +80,16 @@ aside ul { margin: 0; padding-left: 20px; }
 .field-block-lines .block-link i { height: 4px; background: #f6b44b; box-shadow: 0 0 18px #f6b44b; }
 .zone.drag-target { outline: 2px dashed rgba(246,180,75,.55); outline-offset: 4px; }
 .card[draggable="true"] { cursor: grab; }
+/* Refinamientos visuales de mesa */
+.side-zones { background: transparent; border: 0; box-shadow: none; padding: 0; overflow: visible; }
+.player-board { grid-template-columns: 300px minmax(0, 1fr); align-items: center; overflow: visible; }
+.zone-card.pile { width: 126px; min-height: 176px; padding: 8px; }
+.pile-slot { min-width: 132px; min-height: 182px; display: grid; place-items: center; }
+.pile-card { width: 76px; height: 98px; }
+.card-detail { display: none !important; }
+.card-art { width: 100%; height: 86px; object-fit: cover; border-radius: 12px; margin-bottom: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+.info-art { width: 100%; max-height: 180px; object-fit: cover; border-radius: 16px; margin-bottom: 12px; }
+.buff { color: #55e58f; text-shadow: 0 0 10px rgba(85,229,143,.45); }
+.debuff { color: #ff5f6f; text-shadow: 0 0 10px rgba(255,95,111,.45); }
+.card p { font-weight: 800; }
+.card small { margin-top: 8px; }
