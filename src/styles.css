@@ -63,3 +63,20 @@ aside ul { margin: 0; padding-left: 20px; }
 .builder-panel button, .deck-button { background: #f6b44b; color: #21110d; font-weight: 800; cursor: pointer; }
 .deck-button.selected { outline: 3px solid #ffe0a3; }
 @media (max-width: 980px) { .builder-grid { grid-template-columns: 1fr; } }
+.side-zones { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; align-items: center; }
+.pile-slot.cemetery { grid-column: 1; grid-row: 2; }
+.pile-slot.banished { grid-column: 1; grid-row: 3; }
+.pile-slot.paid { grid-column: 2; grid-row: 1; }
+.pile-slot.deck { grid-column: 2; grid-row: 2; }
+.pile-slot.gold { grid-column: 2; grid-row: 3; }
+.zone-card.pile { min-height: 132px; display: grid; place-items: center; gap: 6px; text-align: center; }
+.pile-card { width: 86px; height: 112px; border-radius: 12px; display: grid; place-items: center; padding: 8px; box-sizing: border-box; box-shadow: inset 0 0 0 2px rgba(255,255,255,.14), 0 10px 24px rgba(0,0,0,.3); overflow: hidden; }
+.pile-card.back { background: linear-gradient(145deg, #231833, #5d4fc4); color: #f6b44b; font-size: 2rem; }
+.pile-card.face { background: linear-gradient(145deg, #8f5a2a, #2d1c12); color: #fff; font-size: .8rem; }
+.card-info-window { position: fixed; left: 24px; top: 120px; z-index: 200; width: min(360px, calc(100vw - 48px)); padding: 22px; border-radius: 24px; background: rgba(18, 12, 24, .98); border: 1px solid rgba(246,180,75,.6); box-shadow: 0 28px 100px rgba(0,0,0,.58); }
+.card-info-window h2 { margin: 0 0 12px; color: #f6b44b; }
+.field-block-lines { position: relative; margin: -4px 0 4px; min-height: 20px; pointer-events: none; }
+.field-block-lines .block-link { display: grid; grid-template-columns: minmax(100px, 1fr) 1fr minmax(100px, 1fr); align-items: center; margin: 2px 0; }
+.field-block-lines .block-link i { height: 4px; background: #f6b44b; box-shadow: 0 0 18px #f6b44b; }
+.zone.drag-target { outline: 2px dashed rgba(246,180,75,.55); outline-offset: 4px; }
+.card[draggable="true"] { cursor: grab; }

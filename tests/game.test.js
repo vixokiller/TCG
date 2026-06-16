@@ -16,6 +16,7 @@ import {
   declareBlocker,
   groupPaidGold,
   moveAllyToAttack,
+  moveAllyToDefense,
   playCard,
   returnAllyToHand,
   shuffleAllyIntoCastle,
@@ -73,6 +74,22 @@ test('allies are played to defense and cannot attack the turn they enter unless 
   assert.match(moveAllyToAttack(player, 0, state), /no puede atacar/);
   player.defenseLine[0].enteredTurn = state.turn - 1;
   assert.match(moveAllyToAttack(player, 0, state), /Línea de Ataque/);
+});
+
+
+
+test('attack line allies can return to defense during vigilia before attack declaration', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.attackLine.push({ id: 'ally', name: 'Atacante', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, exhausted: false });
+
+  assert.match(moveAllyToDefense(player, 0, state), /Línea de Defensa/);
+  assert.equal(player.attackLine.length, 0);
+  assert.equal(player.defenseLine.at(-1).name, 'Atacante');
+
+  advancePhase(state);
+  player.attackLine.push({ id: 'ally-2', name: 'Tarde', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, exhausted: false });
+  assert.match(moveAllyToDefense(player, 0, state), /antes de la Declaración/);
 });
 
 test('haste allies can attack the turn they enter play', () => {
