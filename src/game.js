@@ -18,7 +18,7 @@ export const DECK_COMPOSITION = {
   [CARD_TYPES.ARMA]: 2,
 };
 
-const makeCard = (id, name, type, cost = 0, strength = 0, text = '', ability = null, race = null) => ({ id, name, type, cost, strength, text, ability, race });
+const makeCard = (id, name, type, cost = 0, strength = 0, text = '', ability = null, race = null, imageUrl = '') => ({ id, name, type, cost, strength, text, ability, race, imageUrl });
 const clone = (card, id) => ({ ...card, id });
 const abilityLabels = {
   raceGuardian: 'Guardia de raza: Aliados de la misma raza en defensa obtienen +1.',
@@ -59,7 +59,7 @@ function saveLibrary(state) {
 }
 
 export const cardPool = [
-  makeCard('oro-canelo', 'Oro de Canelo', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
+  makeCard('oro-canelo', 'Oro de Canelo', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.', null, null, '/assets/cards/oro-canelo.svg'),
   makeCard('oro-copihue', 'Oro de Copihue', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
   makeCard('oro-volcan', 'Oro del Volcán', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
   makeCard('aliado-trauco', 'Guardián del Bosque', CARD_TYPES.ALIADO, 1, 2, 'Caballero · Guardia: tus Caballeros en defensa tienen +1.', 'raceGuardian', 'Caballero'),
@@ -434,7 +434,7 @@ function wireDeckBuilder(state) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = data.get('type');
-    const card = { ...makeCard(`custom-${Date.now()}`, data.get('name'), type, Number(data.get('cost')), Number(data.get('strength')), data.get('text'), null, data.get('race') || null), imageUrl: data.get('imageUrl') || '', custom: true };
+    const card = { ...makeCard(`custom-${Date.now()}`, data.get('name'), type, Number(data.get('cost')), Number(data.get('strength')), data.get('text'), null, data.get('race') || null, data.get('imageUrl') || ''), custom: true };
     state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); saveLibrary(state); render(state);
   });
 }

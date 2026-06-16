@@ -59,3 +59,11 @@ npm start
 - Para agregar Aliados persistentes desde la interfaz, entra a **Constructor**, completa el formulario de Crear carta, elige tipo `Aliado`, agrega raza, fuerza, coste, texto/habilidad y opcionalmente una URL de imagen. La carta se guarda en `localStorage` junto con los mazos de usuario.
 - Para agregar cartas base desde código, edita `cardPool` en `src/game.js` y usa `makeCard(id, nombre, CARD_TYPES.ALIADO, coste, fuerza, texto, habilidad, raza)`.
 - Para reemplazar la imagen de una carta, agrega la propiedad `imageUrl` a la carta o usa el campo “URL de imagen opcional” del Constructor. Puede ser una URL web o una ruta local servida por el proyecto, por ejemplo `/assets/mi-carta.png`.
+
+
+## Imágenes de cartas
+
+- La carpeta `assets/cards/` está reservada para guardar imágenes de cartas.
+- Para enlazar una imagen desde código, agrega la ruta en el último parámetro de `makeCard`, por ejemplo `/assets/cards/oro-canelo.svg`.
+- Para cartas creadas desde la interfaz, usa el campo “URL de imagen opcional” en el Constructor. Si el archivo está en esta carpeta, usa una ruta como `/assets/cards/mi-carta.png`.
+- Se agregó `assets/cards/oro-canelo.svg` como ejemplo de imagen local enlazada desde `cardPool`.
