@@ -67,3 +67,11 @@ npm start
 - Para enlazar una imagen desde código, agrega la ruta en el último parámetro de `makeCard`, por ejemplo `/assets/cards/oro-canelo.svg`.
 - Para cartas creadas desde la interfaz, usa el campo “URL de imagen opcional” en el Constructor. Si el archivo está en esta carpeta, usa una ruta como `/assets/cards/mi-carta.png`.
 - Se agregó `assets/cards/oro-canelo.svg` como ejemplo de imagen local enlazada desde `cardPool`.
+
+
+## Base de datos de cartas
+
+- La base de datos editable vive en `src/cardDatabase.js`. Cada carta se ingresa con `createCardRecord`.
+- Cada registro contiene: `name`, `image`, `cost`, `strength`, `type`, `race`, `ability`, `rarity`, `code`, `edition` y `product`.
+- Para que una habilidad sea funcional, usa una clave soportada en `ability`, por ejemplo `drawOnEnter`, `drawTwo`, `haste`, `recycleOnEnter`, `banishOnHit`, `raceGuardian`, `foyeDefenseBuff`, `machiExtraDraw` o `weaponBuff`.
+- El juego transforma esos registros con `toPlayableCard`, de modo que puedes ingresar cartas por código en un solo lugar y usarlas en el juego y en el Constructor.

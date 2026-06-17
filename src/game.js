@@ -1,3 +1,4 @@
+import { CARD_DATABASE, createCardRecord, getPlayableCards, toPlayableCard } from './cardDatabase.js';
 export const CARD_TYPES = {
   ORO: 'Oro',
   ALIADO: 'Aliado',
@@ -18,7 +19,7 @@ export const DECK_COMPOSITION = {
   [CARD_TYPES.ARMA]: 2,
 };
 
-const makeCard = (id, name, type, cost = 0, strength = 0, text = '', ability = null, race = null, imageUrl = '') => ({ id, name, type, cost, strength, text, ability, race, imageUrl });
+const makeCard = (id, name, type, cost = 0, strength = 0, text = '', ability = null, race = null, imageUrl = '', rarity = 'Común', edition = 'Base Austral', product = 'Mazo Inicial Austral') => ({ id, code: id, name, type, cost, strength, text, ability, race, imageUrl, rarity, edition, product });
 const clone = (card, id) => ({ ...card, id });
 const abilityLabels = {
   raceGuardian: 'Guardia de raza: Aliados de la misma raza en defensa obtienen +1.',
@@ -26,6 +27,11 @@ const abilityLabels = {
   banishOnHit: 'Impacto: si no es bloqueado, destierra 1 carta adicional.',
   haste: 'Ímpetu: puede atacar el turno que entra en juego.',
   recycleOnEnter: 'Entrada: baraja 2 cartas de tu Cementerio en tu Mazo Castillo.',
+  drawTwo: 'Roba 2 cartas.',
+  banishTwoFromCastle: 'Destierra 2 cartas del Castillo rival.',
+  foyeDefenseBuff: 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.',
+  machiExtraDraw: 'Continuo: en Robo, roba 1 carta adicional.',
+  weaponBuff: 'Anexar: el Aliado portador obtiene +2 fuerza.',
 };
 function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.ability : (card.text || 'Sin habilidad.'); }
 function shuffleDeck(cards) {
@@ -58,22 +64,7 @@ function saveLibrary(state) {
   localStorage.setItem('austral-tcg-library', JSON.stringify({ customCards, userDecks }));
 }
 
-export const cardPool = [
-  makeCard('oro-canelo', 'Oro de Canelo', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.', null, null, '/assets/cards/oro-canelo.svg'),
-  makeCard('oro-copihue', 'Oro de Copihue', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
-  makeCard('oro-volcan', 'Oro del Volcán', CARD_TYPES.ORO, 0, 0, 'Paga costes y despierta leyendas.'),
-  makeCard('aliado-trauco', 'Guardián del Bosque', CARD_TYPES.ALIADO, 1, 2, 'Caballero · Guardia: tus Caballeros en defensa tienen +1.', 'raceGuardian', 'Caballero'),
-  makeCard('aliado-pincoya', 'Danzante de Mareas', CARD_TYPES.ALIADO, 2, 3, 'Faerie · Marea: cuando entra en juego, roba 1 carta.', 'drawOnEnter', 'Faerie'),
-  makeCard('aliado-caleuche', 'Nave Fantasma', CARD_TYPES.ALIADO, 3, 5, 'Dragón · Evasivo: si no es bloqueado, destierra 1 carta adicional.', 'banishOnHit', 'Dragón'),
-  makeCard('aliado-condor', 'Cóndor del Alba', CARD_TYPES.ALIADO, 2, 4, 'Héroe · Ímpetu: puede atacar el turno que entra en juego.', 'haste', 'Héroe'),
-  makeCard('aliado-pillan', 'Pillán de la Cumbre', CARD_TYPES.ALIADO, 4, 6, 'Titán · Memoria: al entrar baraja 2 cartas de tu Cementerio.', 'recycleOnEnter', 'Titán'),
-  makeCard('talisman-luna', 'Rito de Luna Austral', CARD_TYPES.TALISMAN, 1, 0, 'Roba 2 cartas.'),
-  makeCard('talisman-tormenta', 'Tormenta del Pacífico', CARD_TYPES.TALISMAN, 2, 0, 'Destierra 2 cartas del Castillo rival.'),
-  makeCard('totem-foye', 'Tótem del Foye', CARD_TYPES.TOTEM, 2, 0, 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.'),
-  makeCard('totem-machi', 'Tótem de la Machi', CARD_TYPES.TOTEM, 3, 0, 'Continuo: en Robo, roba 1 carta adicional.'),
-  makeCard('arma-lanza', 'Lanza de Colihue', CARD_TYPES.ARMA, 1, 2, 'Anexar: el Aliado portador obtiene +2 fuerza.'),
-  makeCard('aliado-atlante', 'Atlante' , CARD_TYPES.ALIADO, 2, 3, 'Cuando Atlante entra en juego, tu oponente debe botar una carta.', null, 'Titán', 'assets/cards/013-LBPB25-Atlante-MazosCL.webp'),
-];
+export const cardPool = getPlayableCards();
 
 export function buildDeck() {
   const recipe = [[0, 5], [1, 5], [2, 5], [3, 6], [4, 6], [5, 5], [6, 5], [7, 3], [8, 2], [9, 2], [10, 2], [11, 2], [12, 2]];
@@ -128,7 +119,7 @@ export function groupPaidGold(player) {
 function payCost(player, cost) { player.paidGold.push(...player.gold.splice(0, cost).map((card) => ({ ...card, paid: true }))); }
 function allAllies(player) { return [...player.attackLine, ...player.defenseLine]; }
 function weaponBonus(ally) { return ally.weapon?.strength || 0; }
-function totemBonus(player, ally, line) { return player.supportLine.some((card) => card.name === 'Tótem del Foye') && line === 'defenseLine' ? 1 : 0; }
+function totemBonus(player, ally, line) { return player.supportLine.some((card) => card.ability === 'foyeDefenseBuff') && line === 'defenseLine' ? 1 : 0; }
 function raceBonus(player, ally, line) {
   if (!ally.race) return 0;
   return player.defenseLine.some((other) => other !== ally && other.ability === 'raceGuardian' && other.race === ally.race && line === 'defenseLine') ? 1 : 0;
@@ -225,8 +216,8 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   }
   if (card.type === CARD_TYPES.TALISMAN) {
     player.discard.push(card);
-    if (card.name === 'Rito de Luna Austral') draw(player, 2);
-    if (card.name === 'Tormenta del Pacífico') opponent.banished.push(...opponent.deck.splice(0, 2));
+    if (card.ability === 'drawTwo') draw(player, 2);
+    if (card.ability === 'banishTwoFromCastle') opponent.banished.push(...opponent.deck.splice(0, 2));
     if (isTalismanWar) state.talismanPasses = 0;
     checkWinner(state);
     return `${player.name} resolvió ${card.name}.`;
@@ -328,7 +319,7 @@ export function advancePhase(state) {
   }
   if (state.phase === 'Robo') {
     const player = state.players[state.currentPlayer];
-    const extraDraw = player.supportLine.some((card) => card.name === 'Tótem de la Machi') ? 1 : 0;
+    const extraDraw = player.supportLine.some((card) => card.ability === 'machiExtraDraw') ? 1 : 0;
     draw(player, 1 + extraDraw);
     checkWinner(state);
     player.playedGold = false;
@@ -358,7 +349,7 @@ function renderCard(card, index, zone, onClick, state = null) {
   const delta = effectiveStrength - (card.strength || 0);
   const strengthHtml = card.strength ? `Fuerza <b>${card.strength}</b>${delta ? ` <b class="${delta > 0 ? 'buff' : 'debuff'}">${delta > 0 ? '+' : ''}${delta}</b>` : ''}` : abilityText(card);
   const imageHtml = card.imageUrl ? `<img class="card-art" src="${card.imageUrl}" alt="${card.name}">` : '';
-  button.className = `card ${card.type.toLowerCase()} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''}`;
+  button.className = `card ${card.type.toLowerCase()} ${card.imageUrl ? 'has-art' : ''} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''}`;
   button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}<strong>${card.name}</strong><span>${card.type}${card.race ? ` · ${card.race}` : ''}${card.cost ? ` · Coste ${card.cost}` : ''}</span><p>${strengthHtml}</p>${card.strength ? `<small>${abilityText(card)}</small>` : ''}`;
   button.title = zone;
   button.disabled = zone.includes('mazo') || zone.includes('cementerio') || zone.includes('destierro') || zone.includes('oro');
@@ -413,7 +404,7 @@ function renderViewedZone(state, active, opponent) {
 function selectedDeck(state) { return state.decks.find((deck) => deck.id === state.selectedDeckId); }
 function renderDeckBuilder(state) {
   const deck = selectedDeck(state);
-  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><div id="deckCards" class="zone compact"></div></article></section></main>`;
+  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option></select><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><div id="deckCards" class="zone compact"></div></article></section></main>`;
 }
 function wireDeckBuilder(state) {
   document.querySelector('#tabGame')?.addEventListener('click', () => { state.currentTab = 'game'; render(state); });
@@ -435,7 +426,8 @@ function wireDeckBuilder(state) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = data.get('type');
-    const card = { ...makeCard(`custom-${Date.now()}`, data.get('name'), type, Number(data.get('cost')), Number(data.get('strength')), data.get('text'), null, data.get('race') || null, data.get('imageUrl') || ''), custom: true };
+    const record = createCardRecord({ code: `USR-${Date.now()}`, name: data.get('name'), type, cost: Number(data.get('cost')), strength: Number(data.get('strength')), text: data.get('text'), ability: data.get('ability') || null, race: data.get('race') || null, image: data.get('imageUrl') || '', rarity: data.get('rarity') || 'Común', edition: data.get('edition') || 'Usuario', product: data.get('product') || 'Carta creada' });
+    const card = { ...toPlayableCard(record), custom: true };
     state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); saveLibrary(state); render(state);
   });
 }
@@ -444,7 +436,7 @@ function wireDeckBuilder(state) {
 function renderPreviewPanel(state) {
   const card = state.previewCard;
   if (!card) return '';
-  return `<aside class="card-info-window">${card.imageUrl ? `<img class="info-art" src="${card.imageUrl}" alt="${card.name}">` : ''}<h2>${card.name}</h2><p><b>Tipo:</b> ${card.type}</p><p><b>Coste:</b> ${card.cost || 0}</p><p><b>Fuerza:</b> ${card.effectiveStrength ?? card.strength ?? 0}</p><p><b>Raza:</b> ${card.race || '—'}</p><p><b>Habilidad:</b> ${abilityText(card)}</p></aside>`;
+  return `<aside class="card-info-window">${card.imageUrl ? `<img class="info-art" src="${card.imageUrl}" alt="${card.name}">` : ''}<h2>${card.name}</h2><p><b>Tipo:</b> ${card.type}</p><p><b>Coste:</b> ${card.cost || 0}</p><p><b>Fuerza:</b> ${card.effectiveStrength ?? card.strength ?? 0}</p><p><b>Raza:</b> ${card.race || '—'}</p><p><b>Rareza:</b> ${card.rarity || '—'}</p><p><b>Código:</b> ${card.code || card.id || '—'}</p><p><b>Edición:</b> ${card.edition || '—'}</p><p><b>Producto:</b> ${card.product || '—'}</p><p><b>Habilidad:</b> ${abilityText(card)}</p></aside>`;
 }
 
 function render(state) {

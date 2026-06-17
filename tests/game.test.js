@@ -1,3 +1,4 @@
+import { CARD_DATABASE } from '../src/cardDatabase.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -21,6 +22,15 @@ import {
   returnAllyToHand,
   shuffleAllyIntoCastle,
 } from '../src/game.js';
+
+
+
+test('card database exposes required management fields', () => {
+  const card = CARD_DATABASE[0];
+  for (const field of ['name', 'image', 'cost', 'strength', 'type', 'race', 'ability', 'rarity', 'code', 'edition', 'product']) {
+    assert.ok(Object.hasOwn(card, field));
+  }
+});
 
 test('standard castle deck has 50 cards with requested type composition', () => {
   const deck = buildDeck();
