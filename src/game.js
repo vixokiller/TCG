@@ -1,4 +1,4 @@
-import { CARD_DATABASE, createCardRecord, getPlayableCards, toPlayableCard } from './cardDatabase.js';
+import { CARD_DATABASE, createCardRecord, getPlayableCards, toPlayableCard, validateDeckCopies } from './cardDatabase.js';
 export const CARD_TYPES = {
   ORO: 'Oro',
   ALIADO: 'Aliado',
@@ -32,6 +32,8 @@ const abilityLabels = {
   foyeDefenseBuff: 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.',
   machiExtraDraw: 'Continuo: en Robo, roba 1 carta adicional.',
   weaponBuff: 'Anexar: el Aliado portador obtiene +2 fuerza.',
+  finalGroupGold: 'En la Fase Final puedes agrupar este Oro.',
+  counterCard: 'Anula una carta que se está jugando y la envía al Cementerio.',
 };
 function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.ability : (card.text || 'Sin habilidad.'); }
 function shuffleDeck(cards) {
@@ -67,7 +69,7 @@ function saveLibrary(state) {
 export const cardPool = getPlayableCards();
 
 export function buildDeck() {
-  const recipe = [[0, 5], [1, 5], [2, 5], [3, 6], [4, 6], [5, 5], [6, 5], [7, 3], [8, 2], [9, 2], [10, 2], [11, 2], [12, 2]];
+  const recipe = [[0, 5], [1, 5], [2, 5], [3, 6], [4, 6], [5, 5], [6, 5], [7, 3], [8, 1], [9, 1], [10, 2], [11, 2], [12, 2], [13, 2]];
   return balancedShuffle(recipe.flatMap(([poolIndex, amount]) => Array.from({ length: amount }, (_, i) => clone(cardPool[poolIndex], `${cardPool[poolIndex].id}-${i}`))));
 }
 
@@ -169,6 +171,11 @@ export function moveAllyToDefense(player, attackIndex, state = null) {
   return `${ally.name} volvió a la Línea de Defensa.`;
 }
 
+function resolvePlayedCard(state, card) {
+  const top = state.stack.at(-1);
+  if (top?.card === card) state.stack.pop();
+}
+
 export function playCard(state, playerIndex, handIndex, target = {}) {
   if (state.winner) return 'La partida ya terminó.';
   const player = state.players[playerIndex];
@@ -177,6 +184,17 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   if (!card) return 'No hay carta en esa posición.';
   const isTalismanWar = state.phase === 'Guerra de Talismanes' && card.type === CARD_TYPES.TALISMAN && playerIndex === state.talismanPriority;
   if (state.phase !== 'Vigilia' && !isTalismanWar) return 'Solo puedes jugar cartas en Vigilia; los Talismanes se juegan en Guerra de Talismanes con preferencia.';
+
+  if (card.ability === 'counterCard') {
+    if (!state.stack.length) return 'No hay carta que anular.';
+    if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
+    payCost(player, card.cost);
+    player.hand.splice(handIndex, 1);
+    const canceled = state.stack.pop();
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.discard.push(card);
+    return `${player.name} anuló ${canceled.card.name}.`;
+  }
 
   if (card.type === CARD_TYPES.ORO) {
     if (state.phase !== 'Vigilia') return 'El Oro solo se juega en Vigilia.';
@@ -189,15 +207,18 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
   payCost(player, card.cost);
   player.hand.splice(handIndex, 1);
+  state.stack.push({ card, playerIndex });
 
   if (card.type === CARD_TYPES.ALIADO) {
     player.defenseLine.push({ ...card, exhausted: false, bonus: 0, weapon: null, enteredTurn: state.turn });
     if (card.ability === 'drawOnEnter') draw(player, 1);
     if (card.ability === 'recycleOnEnter') player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, 2)]);
+    resolvePlayedCard(state, card);
     return `${player.name} invocó a ${card.name} en Línea de Defensa.`;
   }
   if (card.type === CARD_TYPES.TOTEM) {
     player.supportLine.push({ ...card, continuous: true });
+    resolvePlayedCard(state, card);
     return `${player.name} levantó ${card.name} en Línea de Apoyo.`;
   }
   if (card.type === CARD_TYPES.ARMA) {
@@ -205,13 +226,16 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
     const targetAlly = Number.isInteger(target.allyIndex) ? allies[target.allyIndex] : allies.find((ally) => !ally.weapon);
     if (!targetAlly) {
       player.discard.push(card);
+      resolvePlayedCard(state, card);
       return 'No había Aliado para anexar el Arma.';
     }
     if (targetAlly.weapon) {
       player.discard.push(card);
+      resolvePlayedCard(state, card);
       return `${targetAlly.name} ya tiene un Arma anexada.`;
     }
     targetAlly.weapon = { ...card, attached: true };
+    resolvePlayedCard(state, card);
     return `${card.name} fue anexada a ${targetAlly.name}.`;
   }
   if (card.type === CARD_TYPES.TALISMAN) {
@@ -220,6 +244,7 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
     if (card.ability === 'banishTwoFromCastle') opponent.banished.push(...opponent.deck.splice(0, 2));
     if (isTalismanWar) state.talismanPasses = 0;
     checkWinner(state);
+    resolvePlayedCard(state, card);
     return `${player.name} resolvió ${card.name}.`;
   }
   return 'Tipo de carta no reconocido.';
@@ -284,7 +309,17 @@ function automaticGrouping(state) {
   player.defenseLine.push(...returning);
   state.log.push(`Agrupación automática: ${grouped} Oro pagado vuelve a Reserva y ${returning.length} Aliado(s) vuelven a Defensa.`);
 }
-function automaticFinal(state) { state.log.push('Fase Final automática: se cierra el turno activo.'); }
+function automaticFinal(state) {
+  const player = state.players[state.currentPlayer];
+  const regroupable = player.paidGold.filter((gold) => gold.ability === 'finalGroupGold');
+  if (regroupable.length) {
+    player.paidGold = player.paidGold.filter((gold) => gold.ability !== 'finalGroupGold');
+    player.gold.push(...regroupable.map((gold) => ({ ...gold, paid: false })));
+    state.log.push(`Fase Final: ${regroupable.length} Oro(s) con habilidad vuelven a Reserva.`);
+    return;
+  }
+  state.log.push('Fase Final automática: se cierra el turno activo.');
+}
 
 export function advancePhase(state) {
   if (state.winner) return 'La partida ya terminó.';
@@ -338,7 +373,7 @@ export function advancePhase(state) {
 export function createGame() {
   const saved = loadSavedLibrary();
   const baseDeck = { id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' };
-  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base' };
+  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base', stack: [] };
   automaticGrouping(state);
   return state;
 }
@@ -404,7 +439,7 @@ function renderViewedZone(state, active, opponent) {
 function selectedDeck(state) { return state.decks.find((deck) => deck.id === state.selectedDeckId); }
 function renderDeckBuilder(state) {
   const deck = selectedDeck(state);
-  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option></select><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><div id="deckCards" class="zone compact"></div></article></section></main>`;
+  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option><option value="counterCard">Anular carta</option><option value="finalGroupGold">Oro: agrupar en Final</option></select><label><input name="unique" type="checkbox"> Carta Única</label><input name="copyLimit" type="number" min="1" value="3" placeholder="Máximo de copias"><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><p class="deck-errors">${validateDeckCopies(deck?.cards || []).join(' ')}</p><div id="deckCards" class="zone compact"></div></article></section></main>`;
 }
 function wireDeckBuilder(state) {
   document.querySelector('#tabGame')?.addEventListener('click', () => { state.currentTab = 'game'; render(state); });
@@ -426,7 +461,7 @@ function wireDeckBuilder(state) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = data.get('type');
-    const record = createCardRecord({ code: `USR-${Date.now()}`, name: data.get('name'), type, cost: Number(data.get('cost')), strength: Number(data.get('strength')), text: data.get('text'), ability: data.get('ability') || null, race: data.get('race') || null, image: data.get('imageUrl') || '', rarity: data.get('rarity') || 'Común', edition: data.get('edition') || 'Usuario', product: data.get('product') || 'Carta creada' });
+    const record = createCardRecord({ code: `USR-${Date.now()}`, name: data.get('name'), type, cost: Number(data.get('cost')), strength: Number(data.get('strength')), text: data.get('text'), ability: data.get('ability') || null, race: data.get('race') || null, image: data.get('imageUrl') || '', rarity: data.get('rarity') || 'Común', edition: data.get('edition') || 'Usuario', product: data.get('product') || 'Carta creada', unique: data.get('unique') === 'on', copyLimit: Number(data.get('copyLimit') || 3) });
     const card = { ...toPlayableCard(record), custom: true };
     state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); saveLibrary(state); render(state);
   });

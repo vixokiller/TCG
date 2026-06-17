@@ -1,4 +1,4 @@
-import { CARD_DATABASE } from '../src/cardDatabase.js';
+import { CARD_DATABASE, validateDeckCopies } from '../src/cardDatabase.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -30,6 +30,41 @@ test('card database exposes required management fields', () => {
   for (const field of ['name', 'image', 'cost', 'strength', 'type', 'race', 'ability', 'rarity', 'code', 'edition', 'product']) {
     assert.ok(Object.hasOwn(card, field));
   }
+});
+
+
+
+test('deck validation enforces unique and copy limits', () => {
+  const unique = { code: 'U-1', name: 'Única Test', unique: true, copyLimit: 1 };
+  const regular = { code: 'R-1', name: 'Regular Test', copyLimit: 3 };
+
+  assert.deepEqual(validateDeckCopies([unique, unique]), ['Única Test excede el máximo de 1 copia(s).']);
+  assert.equal(validateDeckCopies([regular, regular, regular, regular]).at(-1), 'Regular Test excede el máximo de 3 copia(s).');
+});
+
+test('finalGroupGold returns paid gold to reserve during final phase', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.paidGold.push({ id: 'gold-final', name: 'Oro Final', type: CARD_TYPES.ORO, ability: 'finalGroupGold', paid: true });
+  state.phase = 'Asignación de Daño';
+
+  advancePhase(state);
+
+  assert.equal(player.gold.at(-1).name, 'Oro Final');
+});
+
+test('counterCard cancels a pending card and sends both cards to cemeteries', () => {
+  const state = createGame();
+  const pending = { id: 'pending', name: 'Carta Pendiente', type: CARD_TYPES.TALISMAN, cost: 1 };
+  state.stack.push({ card: pending, playerIndex: 0 });
+  state.players[1].gold.push({ id: 'gold-counter-1', name: 'Oro', type: CARD_TYPES.ORO }, { id: 'gold-counter-2', name: 'Oro', type: CARD_TYPES.ORO });
+  state.players[1].hand.unshift({ id: 'counter', name: 'Anular Test', type: CARD_TYPES.TALISMAN, cost: 2, ability: 'counterCard' });
+
+  const result = playCard(state, 1, 0);
+
+  assert.match(result, /anuló/);
+  assert.equal(state.players[0].discard.at(-1).name, 'Carta Pendiente');
+  assert.equal(state.players[1].discard.at(-1).name, 'Anular Test');
 });
 
 test('standard castle deck has 50 cards with requested type composition', () => {

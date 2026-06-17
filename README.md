@@ -75,3 +75,13 @@ npm start
 - Cada registro contiene: `name`, `image`, `cost`, `strength`, `type`, `race`, `ability`, `rarity`, `code`, `edition` y `product`.
 - Para que una habilidad sea funcional, usa una clave soportada en `ability`, por ejemplo `drawOnEnter`, `drawTwo`, `haste`, `recycleOnEnter`, `banishOnHit`, `raceGuardian`, `foyeDefenseBuff`, `machiExtraDraw` o `weaponBuff`.
 - El juego transforma esos registros con `toPlayableCard`, de modo que puedes ingresar cartas por código en un solo lugar y usarlas en el juego y en el Constructor.
+
+
+## Reglas de construcción y respuesta
+
+- Por defecto, un mazo puede tener hasta 3 copias de una misma carta.
+- Una carta con `unique: true` es **Única** y solo puede tener 1 copia en el mazo.
+- Una carta puede definir `copyLimit` para permitir una excepción explícita.
+- La habilidad `finalGroupGold` permite que un Oro pagado vuelva a la Reserva de Oros en la Fase Final.
+- La habilidad `counterCard` anula una carta que se está jugando: la carta anulada no entra al campo y va al Cementerio; la carta que anula también va al Cementerio salvo que indique otra cosa.
+- En el Constructor puedes elegir habilidades funcionales como `Anular carta`, `Oro: agrupar en Final`, `Ímpetu`, `Roba 2`, entre otras.
