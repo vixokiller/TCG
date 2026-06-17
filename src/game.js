@@ -72,6 +72,7 @@ export const cardPool = [
   makeCard('totem-foye', 'Tótem del Foye', CARD_TYPES.TOTEM, 2, 0, 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.'),
   makeCard('totem-machi', 'Tótem de la Machi', CARD_TYPES.TOTEM, 3, 0, 'Continuo: en Robo, roba 1 carta adicional.'),
   makeCard('arma-lanza', 'Lanza de Colihue', CARD_TYPES.ARMA, 1, 2, 'Anexar: el Aliado portador obtiene +2 fuerza.'),
+  makeCard('aliado-atlante', 'Atlante' , CARD_TYPES.ALIADO, 2, 3, 'Cuando Atlante entra en juego, tu oponente debe botar una carta.', null, 'Titán', 'assets/cards/013-LBPB25-Atlante-MazosCL.webp'),
 ];
 
 export function buildDeck() {
