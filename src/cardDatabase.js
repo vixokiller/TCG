@@ -18,7 +18,7 @@ export function createCardRecord({
 
 export const CARD_DATABASE = [
   createCardRecord({ code: 'BA-ORO-001', name: 'Oro de Canelo', image: '/assets/cards/oro-canelo.svg', type: 'Oro', text: 'Paga costes y despierta leyendas.', rarity: 'Común' }),
-  createCardRecord({ code: 'BA-ORO-002', name: 'Oro de Copihue', type: 'Oro', text: 'Paga costes y despierta leyendas.', rarity: 'Común' }),
+  createCardRecord({ code: 'BA-ORO-002', name: 'Oro de Copihue', image: 'assets/cards/Gaitas-promocional.webp-1762835190253', type: 'Oro', text: 'Paga costes y despierta leyendas.', rarity: 'Común' }),
   createCardRecord({ code: 'BA-ORO-003', name: 'Oro del Volcán', type: 'Oro', text: 'Paga costes y despierta leyendas.', rarity: 'Común' }),
   createCardRecord({ code: 'BA-ALI-001', name: 'Guardián del Bosque', cost: 1, strength: 2, type: 'Aliado', race: 'Caballero', ability: 'raceGuardian', text: 'Guardia de raza: tus Caballeros en defensa tienen +1.', rarity: 'Común' }),
   createCardRecord({ code: 'BA-ALI-002', name: 'Danzante de Mareas', cost: 2, strength: 3, type: 'Aliado', race: 'Faerie', ability: 'drawOnEnter', text: 'Entrada: roba 1 carta.', rarity: 'Infrecuente' }),
@@ -30,6 +30,7 @@ export const CARD_DATABASE = [
   createCardRecord({ code: 'BA-TOT-001', name: 'Tótem del Foye', cost: 2, type: 'Tótem', ability: 'foyeDefenseBuff', text: 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.', rarity: 'Infrecuente' }),
   createCardRecord({ code: 'BA-TOT-002', name: 'Tótem de la Machi', cost: 3, type: 'Tótem', ability: 'machiExtraDraw', text: 'Continuo: en Robo, roba 1 carta adicional.', rarity: 'Rara' }),
   createCardRecord({ code: 'BA-ARM-001', name: 'Lanza de Colihue', cost: 1, strength: 2, type: 'Arma', ability: 'weaponBuff', text: 'Anexar: el Aliado portador obtiene +2 fuerza.', rarity: 'Común' }),
+  createCardRecord({ code: 'BA-ALI-006', name: 'Atlante', image: 'assets/cards/013-LBPB25-Atlante-MazosCL.webp', cost: 2, strength: 3, type: 'Aliado', ability: 'haste', text: 'Ímpetu: puede atacar el turno que entra en juego.', rarity: 'Infrecuente' }),
 ];
 
 export function toPlayableCard(record) {
