@@ -100,11 +100,38 @@ test('draw phase discards down to eight cards after drawing', () => {
 });
 
 
+
+
+test('invalidForDeck cards are rejected by deck validation', () => {
+  const invalid = { code: 'OLD-1', name: 'Carta Antigua', invalidForDeck: true };
+  assert.deepEqual(validateDeckCopies([invalid]), ['Carta Antigua no es válida para construir mazos.']);
+});
+
+test('Dragon Dorado counters a pending card and banishes itself', () => {
+  const state = createGame();
+  const pending = { id: 'pending-dragon', name: 'Carta Pendiente', type: CARD_TYPES.TALISMAN, cost: 1 };
+  state.stack.push({ card: pending, playerIndex: 1 });
+  state.players[0].gold.push(
+    { id: 'g1', name: 'Oro', type: CARD_TYPES.ORO },
+    { id: 'g2', name: 'Oro', type: CARD_TYPES.ORO },
+    { id: 'g3', name: 'Oro', type: CARD_TYPES.ORO },
+    { id: 'g4', name: 'Oro', type: CARD_TYPES.ORO },
+  );
+  state.players[0].hand.unshift({ id: 'dragon-golden', name: 'Dragón Dorado', type: CARD_TYPES.ALIADO, cost: 4, strength: 5, ability: 'dragonGoldenCounter' });
+
+  const result = playCard(state, 0, 0);
+
+  assert.match(result, /desterró Dragón Dorado/);
+  assert.equal(state.players[0].banished.at(-1).name, 'Dragón Dorado');
+  assert.equal(state.players[1].discard.at(-1).name, 'Carta Pendiente');
+});
+
 test('cards can combine multiple abilities from text or explicit arrays', () => {
   const dragon = CARD_DATABASE.find((card) => card.name === 'Dragón Dorado');
   const gaitas = CARD_DATABASE.find((card) => card.name === 'Gaitas');
 
-  assert.deepEqual(dragon.ability, ['haste', 'drawOnEnter', 'banishOnHit']);
+  assert.equal(dragon.ability, 'dragonGoldenCounter');
+  assert.equal(dragon.unique, true);
   assert.deepEqual(gaitas.ability, ['foyeDefenseBuff', 'machiExtraDraw']);
 });
 
@@ -117,10 +144,10 @@ test('combined abilities are all functional in gameplay', () => {
     { id: 'g3', name: 'Oro', type: CARD_TYPES.ORO },
     { id: 'g4', name: 'Oro', type: CARD_TYPES.ORO },
   );
-  player.hand.unshift({ id: 'dragon', name: 'Dragón Dorado', type: CARD_TYPES.ALIADO, cost: 4, strength: 5, race: 'Dragón', ability: ['haste', 'drawOnEnter', 'banishOnHit'] });
+  player.hand.unshift({ id: 'dragon', name: 'Dragón de Prueba', type: CARD_TYPES.ALIADO, cost: 4, strength: 5, race: 'Dragón', ability: ['haste', 'drawOnEnter', 'banishOnHit'] });
   const handBefore = player.hand.length;
 
-  assert.match(playCard(state, 0, 0), /Dragón Dorado/);
+  assert.match(playCard(state, 0, 0), /Dragón de Prueba/);
   assert.equal(player.hand.length, handBefore); // salió el Dragón y robó 1 carta.
   assert.match(moveAllyToAttack(player, 0, state), /Línea de Ataque/);
 });

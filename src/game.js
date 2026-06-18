@@ -35,6 +35,18 @@ const abilityLabels = {
   finalGroupGold: 'En la Fase Final puedes agrupar este Oro.',
   counterCard: 'Anula una carta que se está jugando y la envía al Cementerio.',
   cancelAbility: 'Cancela una habilidad activada o disparada que esté en la pila.',
+  dragonGoldenCounter: 'Cuando juegues Dragón Dorado, destiérralo. Puede ser jugado en cualquier momento para anular una carta.',
+  kingArthurPendragon: 'Solo puedes tener un Rey Arturo Pendragón. Tus Caballeros ganan +1 y el oponente bota 2 cartas en cada agrupación. Puedes descartar 2 para salvarlo.',
+  payOneDrawOne: 'Paga 1 de Oro y roba 1 carta.',
+  animateGoldsUntilFinal: 'Convierte tus Oros en Aliados 2/2 hasta la Fase Final; luego van a Oro pagado y destruyes un Oro.',
+  morirDePieCounter: 'Destierra Morir de Pie. Si controlas dos Aliados de una misma Raza, anula una carta oponente que no sea Oro ni Aliado.',
+  heavyHammer: 'Entrada: puedes destruir una carta en juego que no sea Oro. El portador gana +2 fuerza.',
+  carroCelta: 'El portador gana +4 fuerza. Si ataca, destiérralo en la Fase Final. Carta Única.',
+  counterOpponentAlly: 'Anula un Aliado oponente.',
+  saveLeavingAlly: 'Respuesta: salva uno de tus Aliados que vaya a salir del juego.',
+  shuffleNonGoldPermanent: 'Baraja una carta en juego que no sea Oro.',
+  stealAllyUntilEnd: 'Un Aliado oponente pasa a tu Línea de Defensa y al final del turno debe ser destruido.',
+  darkAwakening: 'Respuesta a tu Fase de Agrupación: roba 3 cartas y luego descarta 1.',
 };
 const abilityKinds = {
   raceGuardian: 'continua',
@@ -50,12 +62,25 @@ const abilityKinds = {
   haste: 'continua',
   counterCard: 'activada',
   cancelAbility: 'activada',
+  dragonGoldenCounter: 'activada',
+  kingArthurPendragon: 'continua + disparada',
+  payOneDrawOne: 'activada',
+  animateGoldsUntilFinal: 'activada',
+  morirDePieCounter: 'activada',
+  heavyHammer: 'disparada + continua',
+  carroCelta: 'continua + disparada',
+  counterOpponentAlly: 'activada',
+  saveLeavingAlly: 'activada',
+  shuffleNonGoldPermanent: 'activada',
+  stealAllyUntilEnd: 'activada + disparada',
+  darkAwakening: 'activada',
 };
 function getAbilities(card) { return Array.isArray(card.ability) ? card.ability : (card.ability ? [card.ability] : []); }
 function hasAbility(card, ability) { return getAbilities(card).includes(ability); }
 function abilityText(card) {
   const abilities = getAbilities(card);
-  if (!abilities.length) return card.text || 'Sin habilidad.';
+  if (card.text) return card.text;
+  if (!abilities.length) return 'Sin habilidad.';
   return abilities.map((ability) => abilityLabels[ability] || ability).join(' / ');
 }
 function abilityKind(card) {
@@ -238,6 +263,8 @@ function resolveStackEntry(state, entry) {
   if (card.type === CARD_TYPES.TALISMAN) {
     player.discard.push(card);
     if (hasAbility(card, 'drawTwo')) queueAbility(state, playerIndex, card, 'drawTwo', 'activada', () => draw(player, 2));
+    if (hasAbility(card, 'payOneDrawOne')) queueAbility(state, playerIndex, card, 'payOneDrawOne', 'activada', () => draw(player, 1));
+    if (hasAbility(card, 'darkAwakening')) queueAbility(state, playerIndex, card, 'darkAwakening', 'activada', () => { draw(player, 3); if (player.hand.length) player.discard.push(player.hand.pop()); });
     if (hasAbility(card, 'banishTwoFromCastle')) queueAbility(state, playerIndex, card, 'banishTwoFromCastle', 'activada', () => opponent.banished.push(...opponent.deck.splice(0, 2)));
     resolveAbilities(state);
     checkWinner(state);
@@ -272,8 +299,47 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   const card = player.hand[handIndex];
   if (!card) return 'No hay carta en esa posición.';
   const isTalismanWar = state.phase === 'Guerra de Talismanes' && card.type === CARD_TYPES.TALISMAN && playerIndex === state.talismanPriority;
-  const isResponse = hasAbility(card, 'counterCard') || hasAbility(card, 'cancelAbility');
+  const isResponse = hasAbility(card, 'counterCard') || hasAbility(card, 'cancelAbility') || hasAbility(card, 'dragonGoldenCounter') || hasAbility(card, 'morirDePieCounter') || hasAbility(card, 'counterOpponentAlly');
   if (state.phase !== 'Vigilia' && !isTalismanWar && !isResponse) return 'Solo puedes jugar cartas en Vigilia; los Talismanes se juegan en Guerra de Talismanes con preferencia.';
+
+  if (hasAbility(card, 'dragonGoldenCounter')) {
+    if (!state.stack.length) return 'No hay carta que anular.';
+    if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
+    payCost(player, card.cost);
+    player.hand.splice(handIndex, 1);
+    const canceled = state.stack.pop();
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.banished.push(card);
+    state.responsePrompt = null;
+    return `${player.name} desterró ${card.name} para anular ${canceled.card.name}.`;
+  }
+
+  if (hasAbility(card, 'morirDePieCounter')) {
+    if (!state.stack.length) return 'No hay carta que anular.';
+    const canceled = state.stack.at(-1);
+    if ([CARD_TYPES.ORO, CARD_TYPES.ALIADO].includes(canceled.card.type)) return 'Morir de Pie no puede anular Oros ni Aliados.';
+    const races = player.defenseLine.concat(player.attackLine).reduce((counts, ally) => ({ ...counts, [ally.race || '—']: (counts[ally.race || '—'] || 0) + 1 }), {});
+    if (!Object.values(races).some((count) => count >= 2)) return 'Necesitas controlar dos o más Aliados de una misma Raza.';
+    if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
+    payCost(player, card.cost);
+    player.hand.splice(handIndex, 1);
+    state.stack.pop();
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.banished.push(card);
+    state.responsePrompt = null;
+    return `${player.name} desterró ${card.name} para anular ${canceled.card.name}.`;
+  }
+
+  if (hasAbility(card, 'counterOpponentAlly')) {
+    if (!state.stack.length || state.stack.at(-1).card.type !== CARD_TYPES.ALIADO || state.stack.at(-1).playerIndex === playerIndex) return 'No hay Aliado oponente que anular.';
+    if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
+    payCost(player, card.cost);
+    player.hand.splice(handIndex, 1);
+    const canceled = state.stack.pop();
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.discard.push(card);
+    return `${player.name} anuló el Aliado ${canceled.card.name}.`;
+  }
 
   if (hasAbility(card, 'counterCard')) {
     if (!state.stack.length) return 'No hay carta que anular.';
@@ -538,7 +604,7 @@ function renderViewedZone(state, active, opponent) {
 function selectedDeck(state) { return state.decks.find((deck) => deck.id === state.selectedDeckId); }
 function renderDeckBuilder(state) {
   const deck = selectedDeck(state);
-  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button><button id="testDeck">Probar mazo seleccionado</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option><option value="counterCard">Anular carta</option><option value="cancelAbility">Cancelar habilidad</option><option value="finalGroupGold">Oro: agrupar en Final</option></select><label><input name="unique" type="checkbox"> Carta Única</label><input name="copyLimit" type="number" min="1" value="3" placeholder="Máximo de copias"><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><p class="deck-errors">${validateDeckCopies(deck?.cards || []).join(' ')}</p><div id="deckCards" class="zone compact"></div></article></section></main>`;
+  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button><button id="testDeck">Probar mazo seleccionado</button></header>${renderPreviewPanel(state)}<section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option><option value="counterCard">Anular carta</option><option value="cancelAbility">Cancelar habilidad</option><option value="finalGroupGold">Oro: agrupar en Final</option></select><label><input name="unique" type="checkbox"> Carta Única</label><label><input name="invalidForDeck" type="checkbox"> No válida para crear mazos</label><input name="copyLimit" type="number" min="1" value="3" placeholder="Máximo de copias"><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><p class="deck-errors">${validateDeckCopies(deck?.cards || []).join(' ')}</p><div id="deckCards" class="zone compact"></div></article></section></main>`;
 }
 function wireDeckBuilder(state) {
   document.querySelector('#tabGame')?.addEventListener('click', () => { state.currentTab = 'game'; render(state); });
@@ -555,13 +621,13 @@ function wireDeckBuilder(state) {
     const deck = { id: `user-${Date.now()}`, name: `Mazo usuario ${state.decks.length}`, cards: [], source: 'user' };
     state.decks.push(deck); state.selectedDeckId = deck.id; saveLibrary(state); render(state);
   });
-  renderZone('#catalog', state.cardCatalog, 'catalogo', (i) => { selectedDeck(state)?.cards.push({ ...state.cardCatalog[i], id: `${state.cardCatalog[i].id}-deck-${Date.now()}` }); saveLibrary(state); render(state); });
-  renderZone('#deckCards', selectedDeck(state)?.cards || [], 'mazo usuario', () => {});
+  renderZone('#catalog', state.cardCatalog, 'catalogo', (i) => { const card = state.cardCatalog[i]; if (card.invalidForDeck) state.log.push(`${card.name} no es válida para crear mazos.`); else selectedDeck(state)?.cards.push({ ...card, id: `${card.id}-deck-${Date.now()}` }); saveLibrary(state); render(state); }, state);
+  renderZone('#deckCards', selectedDeck(state)?.cards || [], 'mazo usuario', () => {}, state);
   document.querySelector('#cardForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const type = data.get('type');
-    const record = createCardRecord({ code: `USR-${Date.now()}`, name: data.get('name'), type, cost: Number(data.get('cost')), strength: Number(data.get('strength')), text: data.get('text'), ability: data.get('ability') || null, race: data.get('race') || null, image: data.get('imageUrl') || '', rarity: data.get('rarity') || 'Común', edition: data.get('edition') || 'Usuario', product: data.get('product') || 'Carta creada', unique: data.get('unique') === 'on', copyLimit: Number(data.get('copyLimit') || 3) });
+    const record = createCardRecord({ code: `USR-${Date.now()}`, name: data.get('name'), type, cost: Number(data.get('cost')), strength: Number(data.get('strength')), text: data.get('text'), ability: data.get('ability') || null, race: data.get('race') || null, image: data.get('imageUrl') || '', rarity: data.get('rarity') || 'Común', edition: data.get('edition') || 'Usuario', product: data.get('product') || 'Carta creada', unique: data.get('unique') === 'on', copyLimit: Number(data.get('copyLimit') || 3), invalidForDeck: data.get('invalidForDeck') === 'on' });
     const card = { ...toPlayableCard(record), custom: true };
     state.cardCatalog.push(card); selectedDeck(state)?.cards.push(card); saveLibrary(state); render(state);
   });
@@ -591,7 +657,7 @@ function declineResponse(state) {
 
 function acceptResponse(state) {
   const player = state.players[0];
-  const counterIndex = player.hand.findIndex((card) => hasAbility(card, 'counterCard') && card.cost <= availableGold(player));
+  const counterIndex = player.hand.findIndex((card) => (hasAbility(card, 'counterCard') || hasAbility(card, 'dragonGoldenCounter')) && card.cost <= availableGold(player));
   if (counterIndex < 0) {
     state.log.push('No tienes una carta de anulación pagable en la mano.');
     declineResponse(state);
@@ -652,7 +718,7 @@ function render(state) {
   }, state);
 }
 
-function playerCanCounter(state) { return state.players[0].hand.some((card) => hasAbility(card, 'counterCard') && card.cost <= availableGold(state.players[0])); }
+function playerCanCounter(state) { return state.players[0].hand.some((card) => (hasAbility(card, 'counterCard') || hasAbility(card, 'dragonGoldenCounter')) && card.cost <= availableGold(state.players[0])); }
 
 function openResponseWindow(state) {
   state.responsePrompt = { startedAt: Date.now(), seconds: 10 };

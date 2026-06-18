@@ -12,6 +12,18 @@ const TEXT_ABILITY_PATTERNS = [
   [/fase final.*agrupar/i, 'finalGroupGold'],
   [/anula una carta|anular una carta/i, 'counterCard'],
   [/cancela una habilidad|cancelar una habilidad/i, 'cancelAbility'],
+  [/dragón dorado.*anular una carta|puede ser jugado en cualquier momento para anular una carta/i, 'dragonGoldenCounter'],
+  [/rey arturo pendragón|caballeros ganan.*1|oponente bota 2/i, 'kingArthurPendragon'],
+  [/paga 1 de oro y roba 1|paga 1.*roba 1/i, 'payOneDrawOne'],
+  [/convierte todos los oros.*aliados/i, 'animateGoldsUntilFinal'],
+  [/morir de pie.*anula|anula una carta oponente que no sea oro ni aliado/i, 'morirDePieCounter'],
+  [/martillo pesado.*destruir una carta|portador de martillo pesado gana 2/i, 'heavyHammer'],
+  [/carro celta.*gana 4|destiérralo en la fase final/i, 'carroCelta'],
+  [/anula un aliado oponente/i, 'counterOpponentAlly'],
+  [/traición de mac alpin|salvarlo/i, 'saveLeavingAlly'],
+  [/baraja una carta en juego que no sea oro/i, 'shuffleNonGoldPermanent'],
+  [/aliado oponente.*pasa a tu línea de defensa/i, 'stealAllyUntilEnd'],
+  [/despertar oscuro|robar 3 cartas.*descartar 1/i, 'darkAwakening'],
 ];
 
 function inferAbilitiesFromText(text = '') {
@@ -20,7 +32,10 @@ function inferAbilitiesFromText(text = '') {
 
 function normalizeAbilities(ability, text) {
   const explicit = Array.isArray(ability) ? ability : (typeof ability === 'string' && ability.includes(',') ? ability.split(',').map((item) => item.trim()).filter(Boolean) : (ability ? [ability] : []));
-  return [...new Set([...explicit, ...inferAbilitiesFromText(text)])];
+  const abilities = [...new Set([...explicit, ...inferAbilitiesFromText(text)])];
+  if (abilities.includes('dragonGoldenCounter')) return abilities.filter((ability) => ability !== 'counterCard');
+  if (abilities.includes('morirDePieCounter')) return abilities.filter((ability) => ability !== 'counterCard');
+  return abilities;
 }
 
 export function createCardRecord({
@@ -39,11 +54,12 @@ export function createCardRecord({
   product = 'Mazo Inicial Austral',
   unique = false,
   copyLimit = 3,
+  invalidForDeck = false,
 }) {
   if (!code || !name || !type) throw new Error('Cada carta necesita code, name y type.');
   const abilities = normalizeAbilities(ability, text);
   const normalizedAbility = abilities.length > 1 ? abilities : (abilities[0] || null);
-  return { code, name, image, cost, strength, type, race, ability: normalizedAbility, abilityKind, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit };
+  return { code, name, image, cost, strength, type, race, ability: normalizedAbility, abilityKind, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit, invalidForDeck };
 }
 
 export const CARD_DATABASE = [
@@ -84,6 +100,7 @@ export function toPlayableCard(record) {
     imageUrl: record.image,
     unique: record.unique,
     copyLimit: record.copyLimit,
+    invalidForDeck: record.invalidForDeck,
   };
 }
 
@@ -104,6 +121,7 @@ export function validateDeckCopies(cards) {
     const key = card.code || card.id || card.name;
     const next = (counts.get(key) || 0) + 1;
     counts.set(key, next);
+    if (card.invalidForDeck) errors.push(`${card.name} no es válida para construir mazos.`);
     const max = maxCopiesForCard(card);
     if (next > max) errors.push(`${card.name} excede el máximo de ${max} copia(s).`);
   }

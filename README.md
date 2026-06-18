@@ -110,3 +110,10 @@ npm start
 
 - En el Constructor, selecciona un mazo y pulsa **Probar mazo seleccionado** para iniciar una partida nueva usando exactamente esas cartas en el Mazo Castillo del Jugador.
 - Para facilitar pruebas de cartas y habilidades, los mazos personalizados pueden tener menos de 50 cartas; el juego robará la mano inicial posible y no reemplazará automáticamente el mazo por el mazo base salvo que el mazo seleccionado esté vacío.
+
+## Cartas no válidas y textos de habilidad
+
+- `text` es el texto oficial de habilidad que se muestra en la ventana de información de cartas; las claves internas de `ability` solo se usan para ejecutar reglas.
+- `invalidForDeck: true` marca una carta desactualizada o no válida para construir mazos. El Constructor no la agrega al mazo y la validación reporta el error.
+- `Dragón Dorado` queda como Carta Única y se destierra al jugarse para anular una carta en cualquier momento.
+- El parser reconoce textos para habilidades nuevas como Rey Arturo Pendragón, Morir de Pie, Martillo Pesado, Carro Celta, La Traición de Mac Alpin y Despertar Oscuro, entre otras.
