@@ -49,8 +49,11 @@ test('finalGroupGold returns paid gold to reserve during final phase', () => {
   state.phase = 'Asignación de Daño';
 
   advancePhase(state);
+  assert.equal(state.phase, 'Fase Final');
+  advancePhase(state);
 
-  assert.equal(player.gold.at(-1).name, 'Oro Final');
+  assert.ok(player.gold.some((card) => card.name === 'Oro Final'));
+  assert.equal(state.phase, 'Robo');
 });
 
 test('counterCard cancels a pending card and sends both cards to cemeteries', () => {
@@ -65,6 +68,34 @@ test('counterCard cancels a pending card and sends both cards to cemeteries', ()
   assert.match(result, /anuló/);
   assert.equal(state.players[0].discard.at(-1).name, 'Carta Pendiente');
   assert.equal(state.players[1].discard.at(-1).name, 'Anular Test');
+});
+
+
+
+test('cancelAbility cancels an activated or triggered ability in the stack', () => {
+  const state = createGame();
+  let resolved = false;
+  state.abilityStack.push({ playerIndex: 1, source: { name: 'Habilidad Test' }, ability: 'drawTwo', kind: 'activada', resolve: () => { resolved = true; } });
+  state.players[0].gold.push({ id: 'gold-cancel', name: 'Oro', type: CARD_TYPES.ORO });
+  state.players[0].hand.unshift({ id: 'cancel', name: 'Cancelar Habilidad', type: CARD_TYPES.TALISMAN, cost: 1, ability: 'cancelAbility' });
+
+  const result = playCard(state, 0, 0);
+
+  assert.match(result, /canceló/);
+  assert.equal(state.abilityStack.length, 0);
+  assert.equal(resolved, false);
+});
+
+test('draw phase discards down to eight cards after drawing', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.hand = Array.from({ length: 9 }, (_, index) => ({ id: `h${index}`, name: `Mano ${index}`, type: CARD_TYPES.TALISMAN }));
+  state.phase = 'Robo';
+
+  advancePhase(state);
+
+  assert.equal(player.hand.length, 8);
+  assert.ok(player.discard.length >= 1);
 });
 
 test('standard castle deck has 50 cards with requested type composition', () => {

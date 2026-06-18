@@ -85,3 +85,11 @@ npm start
 - La habilidad `finalGroupGold` permite que un Oro pagado vuelva a la Reserva de Oros en la Fase Final.
 - La habilidad `counterCard` anula una carta que se está jugando: la carta anulada no entra al campo y va al Cementerio; la carta que anula también va al Cementerio salvo que indique otra cosa.
 - En el Constructor puedes elegir habilidades funcionales como `Anular carta`, `Oro: agrupar en Final`, `Ímpetu`, `Roba 2`, entre otras.
+
+## Actualización de habilidades y respuestas
+
+- Las cartas pueden declarar habilidades **continuas**, **disparadas** o **activadas**. Las continuas se calculan mientras la carta esté viva en mesa; las disparadas se ponen en pila cuando ocurre su evento; las activadas se usan al jugar o responder según su texto.
+- `cancelAbility` cancela una habilidad activada o disparada que esté esperando resolución. No cancela habilidades continuas, porque estas no pasan por la pila: funcionan mientras la fuente permanezca en juego.
+- Después de Asignación de Daño comienza la **Fase Final**. Allí concluyen los efectos del turno y se agrupan automáticamente los Oros con `finalGroupGold`.
+- La **Fase de Robo** roba la carta del turno y luego descarta cartas de la mano hasta quedar con máximo 8.
+- Cuando el Rival juega una carta y el Jugador tiene una anulación pagable, aparece una ventana de respuesta durante 10 segundos. Si no se acepta, se resuelve como si el Jugador no hubiese respondido.

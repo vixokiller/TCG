@@ -97,3 +97,13 @@ aside ul { margin: 0; padding-left: 20px; }
 .card.has-art .card-art { width: 100%; height: 100%; min-height: 240px; margin: 0; border-radius: 18px; object-fit: cover; display: block; }
 .card.has-art > strong, .card.has-art > span, .card.has-art > p, .card.has-art > small { position: relative; display: block; margin: 0 10px 6px; padding: 6px 8px; border-radius: 10px; background: rgba(18, 12, 24, .76); transform: translateY(-116px); }
 .card.has-art > strong { color: #fff; margin-top: -2px; }
+
+/* Cartas con arte completo: la imagen se contiene dentro del marco sin recortarse. */
+.card.has-art { aspect-ratio: 63 / 88; min-height: 260px; padding: 0; border-radius: 20px; background: #0e0914; display: grid; grid-template-rows: 1fr auto; }
+.card.has-art .card-art { width: 100%; height: 100%; min-height: 0; object-fit: contain; border-radius: 20px 20px 0 0; background: #0e0914; }
+.card.has-art > strong, .card.has-art > span, .card.has-art > p, .card.has-art > small { transform: none; margin: 0; border-radius: 0; padding: 4px 8px; background: rgba(18, 12, 24, .92); }
+.card.has-art > small { border-radius: 0 0 20px 20px; }
+.info-art { object-fit: contain; background: #0e0914; max-height: 280px; }
+.response-prompt { position: fixed; right: 24px; top: 120px; z-index: 250; width: min(380px, calc(100vw - 48px)); padding: 20px; border-radius: 24px; background: rgba(18, 12, 24, .98); border: 2px solid #f6b44b; box-shadow: 0 28px 100px rgba(0,0,0,.6); }
+.response-prompt button { margin-right: 10px; border: 0; border-radius: 999px; padding: 10px 14px; background: #f6b44b; color: #21110d; font-weight: 900; cursor: pointer; }
+.response-prompt #declineResponse { background: #49384d; color: #f8edd8; }

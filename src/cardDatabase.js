@@ -7,6 +7,7 @@ export function createCardRecord({
   type,
   race = null,
   ability = null,
+  abilityKind = null,
   text = '',
   rarity = 'Común',
   edition = 'Base Austral',
@@ -15,7 +16,7 @@ export function createCardRecord({
   copyLimit = 3,
 }) {
   if (!code || !name || !type) throw new Error('Cada carta necesita code, name y type.');
-  return { code, name, image, cost, strength, type, race, ability, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit };
+  return { code, name, image, cost, strength, type, race, ability, abilityKind, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit };
 }
 
 export const CARD_DATABASE = [
@@ -29,7 +30,8 @@ export const CARD_DATABASE = [
   createCardRecord({ code: 'BA-ALI-005', name: 'Pillán de la Cumbre', cost: 4, strength: 6, type: 'Aliado', race: 'Titán', ability: 'recycleOnEnter', text: 'Única. Entrada: baraja 2 cartas de tu Cementerio en tu Mazo Castillo.', rarity: 'Rara', unique: true }),
   createCardRecord({ code: 'BA-TAL-001', name: 'Rito de Luna Austral', cost: 1, type: 'Talismán', ability: 'drawTwo', text: 'Roba 2 cartas.', rarity: 'Común' }),
   createCardRecord({ code: 'BA-TAL-002', name: 'Tormenta del Pacífico', cost: 2, type: 'Talismán', ability: 'banishTwoFromCastle', text: 'Destierra 2 cartas del Castillo rival.', rarity: 'Infrecuente' }),
-  createCardRecord({ code: 'BA-TAL-003', name: 'Negación Austral', cost: 2, type: 'Talismán', ability: 'counterCard', text: 'Anula una carta que se está jugando y envíala al Cementerio.', rarity: 'Rara' }),
+  createCardRecord({ code: 'BA-TAL-003', name: 'Negación Austral', cost: 2, type: 'Talismán', ability: 'counterCard', abilityKind: 'activada', text: 'Anula una carta que se está jugando y envíala al Cementerio.', rarity: 'Rara' }),
+  createCardRecord({ code: 'BA-TAL-004', name: 'Silencio de los Ngen', cost: 1, type: 'Talismán', ability: 'cancelAbility', abilityKind: 'activada', text: 'Cancela una habilidad activada o disparada.', rarity: 'Infrecuente' }),
   createCardRecord({ code: 'BA-TOT-001', name: 'Tótem del Foye', cost: 2, type: 'Tótem', ability: 'foyeDefenseBuff', text: 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.', rarity: 'Infrecuente' }),
   createCardRecord({ code: 'BA-TOT-002', name: 'Tótem de la Machi', cost: 3, type: 'Tótem', ability: 'machiExtraDraw', text: 'Continuo: en Robo, roba 1 carta adicional.', rarity: 'Rara' }),
   createCardRecord({ code: 'BA-ARM-001', name: 'Lanza de Colihue', cost: 1, strength: 2, type: 'Arma', ability: 'weaponBuff', text: 'Anexar: el Aliado portador obtiene +2 fuerza.', rarity: 'Común' }),
@@ -45,6 +47,7 @@ export function toPlayableCard(record) {
     strength: record.strength,
     text: record.text,
     ability: record.ability,
+    abilityKind: record.abilityKind,
     race: record.race,
     rarity: record.rarity,
     edition: record.edition,
