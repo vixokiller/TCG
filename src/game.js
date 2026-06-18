@@ -51,8 +51,17 @@ const abilityKinds = {
   counterCard: 'activada',
   cancelAbility: 'activada',
 };
-function abilityText(card) { return card.ability ? abilityLabels[card.ability] || card.text || card.ability : (card.text || 'Sin habilidad.'); }
-function abilityKind(card) { return abilityKinds[card.ability] || (card.ability ? 'activada' : '—'); }
+function getAbilities(card) { return Array.isArray(card.ability) ? card.ability : (card.ability ? [card.ability] : []); }
+function hasAbility(card, ability) { return getAbilities(card).includes(ability); }
+function abilityText(card) {
+  const abilities = getAbilities(card);
+  if (!abilities.length) return card.text || 'Sin habilidad.';
+  return abilities.map((ability) => abilityLabels[ability] || ability).join(' / ');
+}
+function abilityKind(card) {
+  const kinds = [...new Set(getAbilities(card).map((ability) => abilityKinds[ability] || 'activada'))];
+  return kinds.length ? kinds.join(' + ') : '—';
+}
 function shuffleDeck(cards) {
   const shuffled = [...cards];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
@@ -138,12 +147,12 @@ export function groupPaidGold(player) {
 function payCost(player, cost) { player.paidGold.push(...player.gold.splice(0, cost).map((card) => ({ ...card, paid: true }))); }
 function allAllies(player) { return [...player.attackLine, ...player.defenseLine]; }
 function weaponBonus(ally) { return ally.weapon?.strength || 0; }
-function totemBonus(player, ally, line) { return player.supportLine.some((card) => card.ability === 'foyeDefenseBuff') && line === 'defenseLine' ? 1 : 0; }
+function totemBonus(player, ally, line) { return player.supportLine.some((card) => hasAbility(card, 'foyeDefenseBuff')) && line === 'defenseLine' ? 1 : 0; }
 function raceBonus(player, ally, line) {
   if (!ally.race) return 0;
-  return player.defenseLine.some((other) => other !== ally && other.ability === 'raceGuardian' && other.race === ally.race && line === 'defenseLine') ? 1 : 0;
+  return player.defenseLine.some((other) => other !== ally && hasAbility(other, 'raceGuardian') && other.race === ally.race && line === 'defenseLine') ? 1 : 0;
 }
-function abilityBonus(ally, line) { return ally.ability === 'raceGuardian' && line === 'defenseLine' ? 1 : 0; }
+function abilityBonus(ally, line) { return hasAbility(ally, 'raceGuardian') && line === 'defenseLine' ? 1 : 0; }
 function totalStrength(player, ally, line) { return ally.strength + (ally.bonus || 0) + weaponBonus(ally) + totemBonus(player, ally, line) + raceBonus(player, ally, line) + abilityBonus(ally, line); }
 
 function destroyAlly(player, line, index) {
@@ -172,7 +181,7 @@ export function moveAllyToAttack(player, defenseIndex, state = null) {
   const ally = player.defenseLine[defenseIndex];
   if (!ally) return 'No hay Aliado en esa posición.';
   if (state?.phase && state.phase !== 'Vigilia') return 'Solo puedes declarar atacantes en Vigilia.';
-  if (state && ally.enteredTurn === state.turn && ally.ability !== 'haste') return `${ally.name} no puede atacar el turno que entró en juego.`;
+  if (state && ally.enteredTurn === state.turn && !hasAbility(ally, 'haste')) return `${ally.name} no puede atacar el turno que entró en juego.`;
   player.defenseLine.splice(defenseIndex, 1);
   player.attackLine.push({ ...ally, exhausted: false });
   return `${ally.name} se movió a la Línea de Ataque.`;
@@ -201,8 +210,8 @@ function resolveStackEntry(state, entry) {
 
   if (card.type === CARD_TYPES.ALIADO) {
     player.defenseLine.push({ ...card, exhausted: false, bonus: 0, weapon: null, enteredTurn: state.turn });
-    if (card.ability === 'drawOnEnter') queueAbility(state, playerIndex, card, 'drawOnEnter', 'disparada', () => draw(player, 1));
-    if (card.ability === 'recycleOnEnter') queueAbility(state, playerIndex, card, 'recycleOnEnter', 'disparada', () => { player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, 2)]); });
+    if (hasAbility(card, 'drawOnEnter')) queueAbility(state, playerIndex, card, 'drawOnEnter', 'disparada', () => draw(player, 1));
+    if (hasAbility(card, 'recycleOnEnter')) queueAbility(state, playerIndex, card, 'recycleOnEnter', 'disparada', () => { player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, 2)]); });
     resolveAbilities(state);
     return `${player.name} invocó a ${card.name} en Línea de Defensa.`;
   }
@@ -226,8 +235,8 @@ function resolveStackEntry(state, entry) {
   }
   if (card.type === CARD_TYPES.TALISMAN) {
     player.discard.push(card);
-    if (card.ability === 'drawTwo') queueAbility(state, playerIndex, card, 'drawTwo', 'activada', () => draw(player, 2));
-    if (card.ability === 'banishTwoFromCastle') queueAbility(state, playerIndex, card, 'banishTwoFromCastle', 'activada', () => opponent.banished.push(...opponent.deck.splice(0, 2)));
+    if (hasAbility(card, 'drawTwo')) queueAbility(state, playerIndex, card, 'drawTwo', 'activada', () => draw(player, 2));
+    if (hasAbility(card, 'banishTwoFromCastle')) queueAbility(state, playerIndex, card, 'banishTwoFromCastle', 'activada', () => opponent.banished.push(...opponent.deck.splice(0, 2)));
     resolveAbilities(state);
     checkWinner(state);
     return `${player.name} resolvió ${card.name}.`;
@@ -261,10 +270,10 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
   const card = player.hand[handIndex];
   if (!card) return 'No hay carta en esa posición.';
   const isTalismanWar = state.phase === 'Guerra de Talismanes' && card.type === CARD_TYPES.TALISMAN && playerIndex === state.talismanPriority;
-  const isResponse = card.ability === 'counterCard' || card.ability === 'cancelAbility';
+  const isResponse = hasAbility(card, 'counterCard') || hasAbility(card, 'cancelAbility');
   if (state.phase !== 'Vigilia' && !isTalismanWar && !isResponse) return 'Solo puedes jugar cartas en Vigilia; los Talismanes se juegan en Guerra de Talismanes con preferencia.';
 
-  if (card.ability === 'counterCard') {
+  if (hasAbility(card, 'counterCard')) {
     if (!state.stack.length) return 'No hay carta que anular.';
     if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
     payCost(player, card.cost);
@@ -276,7 +285,7 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
     return `${player.name} anuló ${canceled.card.name}.`;
   }
 
-  if (card.ability === 'cancelAbility') {
+  if (hasAbility(card, 'cancelAbility')) {
     const cancelableIndex = state.abilityStack.findLastIndex((entry) => entry.kind === 'activada' || entry.kind === 'disparada');
     if (cancelableIndex < 0) return 'No hay habilidad activada o disparada que cancelar.';
     if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
@@ -347,7 +356,7 @@ export function assignDamage(state) {
     }
     const damage = totalStrength(attacker, attackingAlly, 'attackLine');
     defender.discard.push(...defender.deck.splice(0, damage));
-    if (attackingAlly.ability === 'banishOnHit') defender.banished.push(...defender.deck.splice(0, 1));
+    if (hasAbility(attackingAlly, 'banishOnHit')) defender.banished.push(...defender.deck.splice(0, 1));
     attacker.damageThisTurn += damage;
   });
   checkWinner(state);
@@ -365,9 +374,9 @@ function automaticGrouping(state) {
 }
 function automaticFinal(state) {
   const player = state.players[state.currentPlayer];
-  const regroupable = player.paidGold.filter((gold) => gold.ability === 'finalGroupGold');
+  const regroupable = player.paidGold.filter((gold) => hasAbility(gold, 'finalGroupGold'));
   if (regroupable.length) {
-    player.paidGold = player.paidGold.filter((gold) => gold.ability !== 'finalGroupGold');
+    player.paidGold = player.paidGold.filter((gold) => !hasAbility(gold, 'finalGroupGold'));
     player.gold.push(...regroupable.map((gold) => ({ ...gold, paid: false })));
     state.log.push(`Fase Final: ${regroupable.length} Oro(s) con habilidad vuelven a Reserva.`);
     return;
@@ -414,7 +423,7 @@ export function advancePhase(state) {
   }
   if (state.phase === 'Robo') {
     const player = state.players[state.currentPlayer];
-    const extraDraw = player.supportLine.some((card) => card.ability === 'machiExtraDraw') ? 1 : 0;
+    const extraDraw = player.supportLine.some((card) => hasAbility(card, 'machiExtraDraw')) ? 1 : 0;
     draw(player, 1 + extraDraw);
     while (player.hand.length > 8) player.discard.push(player.hand.pop());
     checkWinner(state);
@@ -549,7 +558,7 @@ function declineResponse(state) {
 
 function acceptResponse(state) {
   const player = state.players[0];
-  const counterIndex = player.hand.findIndex((card) => card.ability === 'counterCard' && card.cost <= availableGold(player));
+  const counterIndex = player.hand.findIndex((card) => hasAbility(card, 'counterCard') && card.cost <= availableGold(player));
   if (counterIndex < 0) {
     state.log.push('No tienes una carta de anulación pagable en la mano.');
     declineResponse(state);
@@ -610,7 +619,7 @@ function render(state) {
   }, state);
 }
 
-function playerCanCounter(state) { return state.players[0].hand.some((card) => card.ability === 'counterCard' && card.cost <= availableGold(state.players[0])); }
+function playerCanCounter(state) { return state.players[0].hand.some((card) => hasAbility(card, 'counterCard') && card.cost <= availableGold(state.players[0])); }
 
 function openResponseWindow(state) {
   state.responsePrompt = { startedAt: Date.now(), seconds: 10 };

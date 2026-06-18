@@ -99,3 +99,9 @@ npm start
 - Las cartas en mesa muestran solo su imagen; los datos de fuerza, coste, raza y habilidad aparecen únicamente en la ventana lateral al mantener el mouse sobre la carta.
 - Para jugar un Arma desde la mano, primero se selecciona el Arma y luego se hace clic en el Aliado que la portará. Si no eliges Aliado, el Arma no se paga ni sale de la mano.
 - La ventana de respuesta contra cartas del Rival muestra una barra visual de 10 segundos que se agota hasta que aceptes o rechaces responder.
+
+## Habilidades combinadas
+
+- Una carta puede definir `ability` como arreglo, por ejemplo `['haste', 'drawOnEnter', 'banishOnHit']`, para combinar varias habilidades funcionales.
+- Si no defines `ability`, `createCardRecord` intenta inferir habilidades soportadas desde el texto de la carta, lo que permite ingresar cartas por código sin duplicar la lógica.
+- Se mantienen las cartas agregadas `Dragón Dorado` y `Gaitas` en la base de datos; sus textos se transforman en habilidades combinadas funcionales.

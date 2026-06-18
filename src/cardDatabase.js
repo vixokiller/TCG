@@ -1,3 +1,28 @@
+const TEXT_ABILITY_PATTERNS = [
+  [/puede atacar el turno que entra|ímpetu/i, 'haste'],
+  [/entrada[^.]*roba 1|entrada[^.]*roba una carta/i, 'drawOnEnter'],
+  [/roba 2|roba dos/i, 'drawTwo'],
+  [/baraja 2|baraja dos|cementerio.*mazo castillo/i, 'recycleOnEnter'],
+  [/destierra 2|destierra dos/i, 'banishTwoFromCastle'],
+  [/destierra 1|destierra una carta adicional|impacto/i, 'banishOnHit'],
+  [/misma raza|guardia de raza/i, 'raceGuardian'],
+  [/línea de defensa.*\+1|defensa.*\+1/i, 'foyeDefenseBuff'],
+  [/robo.*adicional/i, 'machiExtraDraw'],
+  [/portador obtiene \+2|anexar/i, 'weaponBuff'],
+  [/fase final.*agrupar/i, 'finalGroupGold'],
+  [/anula una carta|anular una carta/i, 'counterCard'],
+  [/cancela una habilidad|cancelar una habilidad/i, 'cancelAbility'],
+];
+
+function inferAbilitiesFromText(text = '') {
+  return TEXT_ABILITY_PATTERNS.filter(([pattern]) => pattern.test(text)).map(([, ability]) => ability);
+}
+
+function normalizeAbilities(ability, text) {
+  const explicit = Array.isArray(ability) ? ability : (typeof ability === 'string' && ability.includes(',') ? ability.split(',').map((item) => item.trim()).filter(Boolean) : (ability ? [ability] : []));
+  return [...new Set([...explicit, ...inferAbilitiesFromText(text)])];
+}
+
 export function createCardRecord({
   code,
   name,
@@ -16,7 +41,9 @@ export function createCardRecord({
   copyLimit = 3,
 }) {
   if (!code || !name || !type) throw new Error('Cada carta necesita code, name y type.');
-  return { code, name, image, cost, strength, type, race, ability, abilityKind, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit };
+  const abilities = normalizeAbilities(ability, text);
+  const normalizedAbility = abilities.length > 1 ? abilities : (abilities[0] || null);
+  return { code, name, image, cost, strength, type, race, ability: normalizedAbility, abilityKind, text, rarity, edition, product, unique, copyLimit: unique ? 1 : copyLimit };
 }
 
 export const CARD_DATABASE = [
