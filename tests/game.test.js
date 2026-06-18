@@ -192,13 +192,27 @@ test('enter-play recycle ability shuffles two cemetery cards into castle', () =>
   assert.equal(player.deck.length, before + 2);
 });
 
+
+
+test('weapons require selecting an ally target before being played', () => {
+  const state = createGame();
+  const player = state.players[0];
+  player.gold.push({ id: 'extra-gold', name: 'Oro Extra', type: CARD_TYPES.ORO });
+  player.defenseLine.push({ id: 'ally', name: 'Portador', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, weapon: null });
+  player.hand.unshift({ id: 'weapon', name: 'Arma Test', type: CARD_TYPES.ARMA, cost: 1, strength: 2 });
+
+  assert.match(playCard(state, 0, 0), /Selecciona un Aliado/);
+  assert.equal(player.hand[0].name, 'Arma Test');
+  assert.equal(player.gold.length, 2);
+});
+
 test('weapons attach to one ally and are destroyed with the bearer', () => {
   const state = createGame();
   const player = state.players[0];
   player.gold.push({ id: 'extra-gold', name: 'Oro Extra', type: CARD_TYPES.ORO });
   player.defenseLine.push({ id: 'ally', name: 'Portador', type: CARD_TYPES.ALIADO, strength: 2, bonus: 0, weapon: null });
   player.hand.unshift({ id: 'weapon', name: 'Arma Test', type: CARD_TYPES.ARMA, cost: 1, strength: 2 });
-  assert.match(playCard(state, 0, 0), /anexada/);
+  assert.match(playCard(state, 0, 0, { allyIndex: 0 }), /anexada/);
   assert.equal(player.defenseLine[0].weapon.name, 'Arma Test');
   returnAllyToHand(player, 'defenseLine', 0);
   assert.equal(player.discard.at(-1).name, 'Arma Test');

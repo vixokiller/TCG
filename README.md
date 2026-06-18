@@ -93,3 +93,9 @@ npm start
 - Después de Asignación de Daño comienza la **Fase Final**. Allí concluyen los efectos del turno y se agrupan automáticamente los Oros con `finalGroupGold`.
 - La **Fase de Robo** roba la carta del turno y luego descarta cartas de la mano hasta quedar con máximo 8.
 - Cuando el Rival juega una carta y el Jugador tiene una anulación pagable, aparece una ventana de respuesta durante 10 segundos. Si no se acepta, se resuelve como si el Jugador no hubiese respondido.
+
+## Ajustes de interfaz recientes
+
+- Las cartas en mesa muestran solo su imagen; los datos de fuerza, coste, raza y habilidad aparecen únicamente en la ventana lateral al mantener el mouse sobre la carta.
+- Para jugar un Arma desde la mano, primero se selecciona el Arma y luego se hace clic en el Aliado que la portará. Si no eliges Aliado, el Arma no se paga ni sale de la mano.
+- La ventana de respuesta contra cartas del Rival muestra una barra visual de 10 segundos que se agota hasta que aceptes o rechaces responder.
