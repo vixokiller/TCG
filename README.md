@@ -133,3 +133,9 @@ npm start
 
 - Las claves de habilidad ahora aceptan alias frecuentes sin distinguir mayúsculas, por ejemplo `payonedrawone`, `pay-one-draw-one` o `pay_one_draw_one` se normalizan a `payOneDrawOne`.
 - Si una carta personalizada ya estaba guardada con una clave en minúsculas, al cargar la biblioteca se normaliza y el botón **Activar** debería aparecer si la carta está en una zona propia de juego.
+
+## Arrastrar cartas y activar en mesa
+
+- Las cartas de la mano ahora se juegan arrastrándolas a su zona: Aliados a Línea de Defensa, Tótems a Línea de Apoyo y Oros a Reserva de Oros.
+- El botón **Activar** ya no aparece en la mano; aparece sobre la imagen de cartas propias en zonas de juego cuando tengan habilidades activadas.
+- Si haces clic en una carta de la mano, el juego muestra una instrucción en la bitácora en vez de jugarla directamente.
