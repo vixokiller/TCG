@@ -1,3 +1,21 @@
+const ABILITY_ALIASES = {
+  payonedrawone: 'payOneDrawOne',
+  'pay_one_draw_one': 'payOneDrawOne',
+  'pay-one-draw-one': 'payOneDrawOne',
+  paga1roba1: 'payOneDrawOne',
+  drawtwo: 'drawTwo',
+  'dragon goldencounter': 'dragonGoldenCounter',
+  dragongoldencounter: 'dragonGoldenCounter',
+  countercard: 'counterCard',
+  cancelability: 'cancelAbility',
+};
+
+function normalizeAbilityKey(ability) {
+  const trimmed = String(ability).trim();
+  const compact = trimmed.toLowerCase().replace(/\s+/g, '');
+  return ABILITY_ALIASES[trimmed.toLowerCase()] || ABILITY_ALIASES[compact] || trimmed;
+}
+
 const TEXT_ABILITY_PATTERNS = [
   [/puede atacar el turno que entra|ímpetu/i, 'haste'],
   [/entrada[^.]*roba 1|entrada[^.]*roba una carta/i, 'drawOnEnter'],
@@ -31,7 +49,7 @@ function inferAbilitiesFromText(text = '') {
 }
 
 function normalizeAbilities(ability, text) {
-  const explicit = Array.isArray(ability) ? ability : (typeof ability === 'string' && ability.includes(',') ? ability.split(',').map((item) => item.trim()).filter(Boolean) : (ability ? [ability] : []));
+  const explicit = (Array.isArray(ability) ? ability : (typeof ability === 'string' && ability.includes(',') ? ability.split(',').map((item) => item.trim()).filter(Boolean) : (ability ? [ability] : []))).map(normalizeAbilityKey);
   const abilities = [...new Set([...explicit, ...inferAbilitiesFromText(text)])];
   if (abilities.includes('dragonGoldenCounter')) return abilities.filter((ability) => ability !== 'counterCard');
   if (abilities.includes('morirDePieCounter')) return abilities.filter((ability) => ability !== 'counterCard');

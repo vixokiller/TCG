@@ -128,3 +128,8 @@ npm start
 
 - El botón **Activar** se muestra sobre cartas propias que tengan cualquier habilidad marcada como activada o una habilidad registrada en el motor reutilizable.
 - Las cartas personalizadas guardadas en `localStorage` se normalizan al cargar la biblioteca, por lo que si su texto dice una habilidad activada, el botón aparece aunque la carta haya sido creada antes de esta actualización.
+
+## Si no aparece Activar
+
+- Las claves de habilidad ahora aceptan alias frecuentes sin distinguir mayúsculas, por ejemplo `payonedrawone`, `pay-one-draw-one` o `pay_one_draw_one` se normalizan a `payOneDrawOne`.
+- Si una carta personalizada ya estaba guardada con una clave en minúsculas, al cargar la biblioteca se normaliza y el botón **Activar** debería aparecer si la carta está en una zona propia de juego.

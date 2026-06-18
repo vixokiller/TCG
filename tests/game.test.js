@@ -1,4 +1,4 @@
-import { CARD_DATABASE, validateDeckCopies } from '../src/cardDatabase.js';
+import { CARD_DATABASE, createCardRecord, toPlayableCard, validateDeckCopies } from '../src/cardDatabase.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -156,6 +156,22 @@ test('combined abilities are all functional in gameplay', () => {
 
 
 
+
+
+
+test('ability aliases normalize lowercase payonedrawone for activation buttons', () => {
+  const record = CARD_DATABASE.find((card) => card.name === 'Gaitas');
+  assert.ok(record);
+  const customLike = { ...toPlayableCard(createCardRecord({ code: 'alias', name: 'Tótem Alias', type: CARD_TYPES.TOTEM, ability: 'payonedrawone' })), custom: true };
+  assert.equal(customLike.ability, 'payOneDrawOne');
+  const state = createGame();
+  const player = state.players[0];
+  player.gold.push({ id: 'gold-alias', name: 'Oro', type: CARD_TYPES.ORO });
+  player.supportLine.push(customLike);
+  const before = player.hand.length;
+  activateCardAbility(state, 0, 'supportLine', 0);
+  assert.equal(player.hand.length, before + 1);
+});
 
 test('activated abilities can be activated from permanents using reusable effects', () => {
   const state = createGame();
