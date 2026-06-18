@@ -123,3 +123,8 @@ npm start
 - Las habilidades activadas en cartas en juego muestran un recuadro **Activar** sobre la carta; al hacer clic se llama a `activateCardAbility` y se resuelve la habilidad disponible.
 - Las habilidades ahora usan efectos reutilizables (`drawCards`, `discardCards`, `banishFromCastle`, `counterTopCard`, etc.) para que nuevas cartas combinen piezas de reglas sin escribir una función completa por carta.
 - También existe una cola de efectos retrasados para reutilizar disparos de timing como **Fase Final**, por ejemplo desterrar una carta al cierre del turno.
+
+## Corrección de activación visible
+
+- El botón **Activar** se muestra sobre cartas propias que tengan cualquier habilidad marcada como activada o una habilidad registrada en el motor reutilizable.
+- Las cartas personalizadas guardadas en `localStorage` se normalizan al cargar la biblioteca, por lo que si su texto dice una habilidad activada, el botón aparece aunque la carta haya sido creada antes de esta actualización.

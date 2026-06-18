@@ -89,7 +89,7 @@ function abilityKind(card) {
 }
 
 const activatedAbilities = new Set(['drawTwo', 'banishTwoFromCastle', 'payOneDrawOne', 'darkAwakening', 'animateGoldsUntilFinal', 'shuffleNonGoldPermanent', 'stealAllyUntilEnd']);
-function hasActivatedAbility(card) { return getAbilities(card).some((ability) => activatedAbilities.has(ability)); }
+function hasActivatedAbility(card) { return getAbilities(card).some((ability) => activatedAbilities.has(ability) || abilityKinds[ability]?.includes('activada')); }
 
 const abilityEffects = {
   drawCards: ({ player }, amount = 1) => draw(player, amount),
@@ -160,6 +160,33 @@ function saveLibrary(state) {
   const customCards = state.cardCatalog.filter((card) => card.custom);
   const userDecks = state.decks.filter((deck) => deck.source === 'user');
   localStorage.setItem('austral-tcg-library', JSON.stringify({ customCards, userDecks }));
+}
+
+function normalizeSavedCard(card) {
+  if (!card?.custom) return card;
+  const record = createCardRecord({
+    code: card.code || card.id || `USR-${Date.now()}`,
+    name: card.name,
+    image: card.imageUrl || card.image || '',
+    cost: card.cost || 0,
+    strength: card.strength || 0,
+    type: card.type,
+    race: card.race || null,
+    ability: card.ability || null,
+    abilityKind: card.abilityKind || null,
+    text: card.text || '',
+    rarity: card.rarity || 'Común',
+    edition: card.edition || 'Usuario',
+    product: card.product || 'Carta creada',
+    unique: Boolean(card.unique),
+    copyLimit: card.copyLimit || 3,
+    invalidForDeck: Boolean(card.invalidForDeck),
+  });
+  return { ...toPlayableCard(record), custom: true };
+}
+
+function normalizeSavedDeck(deck) {
+  return { ...deck, cards: (deck.cards || []).map(normalizeSavedCard) };
 }
 
 export const cardPool = getPlayableCards();
@@ -587,7 +614,7 @@ export function startGameWithSelectedDeck(state) {
 export function createGame() {
   const saved = loadSavedLibrary();
   const baseDeck = { id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' };
-  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base', stack: [], abilityStack: [], responsePrompt: null, responseTimer: null, pendingWeaponHandIndex: null, delayedEffects: [] };
+  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...(saved.customCards || []).map(normalizeSavedCard)], decks: [baseDeck, ...(saved.userDecks || []).map(normalizeSavedDeck)], selectedDeckId: saved.userDecks[0]?.id || 'base', stack: [], abilityStack: [], responsePrompt: null, responseTimer: null, pendingWeaponHandIndex: null, delayedEffects: [] };
   automaticGrouping(state);
   return state;
 }
@@ -618,8 +645,8 @@ export function activateCardAbility(state, playerIndex, line, index) {
 function renderCard(card, index, zone, onClick, state = null) {
   const button = document.createElement('button');
   const imageHtml = card.imageUrl ? `<img class="card-art" src="${card.imageUrl}" alt="${card.name}">` : `<div class="card-art missing-art" aria-label="${card.name}">${card.name}</div>`;
-  button.className = `card image-only ${card.type.toLowerCase()} ${card.imageUrl ? 'has-art' : 'no-art'} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''} ${state?.pendingWeaponHandIndex !== null && (zone === 'defensa' || zone === 'ataque') ? 'weapon-target' : ''}`;
-  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}${hasActivatedAbility(card) && !zone.includes('rival') && !zone.includes('mano') && !zone.includes('catalogo') && !zone.includes('mazo') ? '<span class="activate-ability">Activar</span>' : ''}`;
+  button.className = `card image-only ${card.type.toLowerCase()} ${card.imageUrl ? 'has-art' : 'no-art'} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''} ${state?.pendingWeaponHandIndex !== null && (zone === 'defensa' || zone === 'ataque') ? 'weapon-target' : ''} ${hasActivatedAbility(card) ? 'activatable-card' : ''}`;
+  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}${hasActivatedAbility(card) && !zone.includes('rival') && !zone.includes('catalogo') && !zone.includes('mazo') && !zone.includes('visor') ? '<span class="activate-ability" role="button" aria-label="Activar habilidad">Activar</span>' : ''}`;
   button.title = zone;
   button.disabled = zone.includes('mazo') || zone.includes('cementerio') || zone.includes('destierro') || zone.includes('oro');
   if (zone === 'defensa' || zone === 'ataque') {
