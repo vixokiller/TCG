@@ -117,3 +117,9 @@ npm start
 - `invalidForDeck: true` marca una carta desactualizada o no válida para construir mazos. El Constructor no la agrega al mazo y la validación reporta el error.
 - `Dragón Dorado` queda como Carta Única y se destierra al jugarse para anular una carta en cualquier momento.
 - El parser reconoce textos para habilidades nuevas como Rey Arturo Pendragón, Morir de Pie, Martillo Pesado, Carro Celta, La Traición de Mac Alpin y Despertar Oscuro, entre otras.
+
+## Motor reutilizable de habilidades
+
+- Las habilidades activadas en cartas en juego muestran un recuadro **Activar** sobre la carta; al hacer clic se llama a `activateCardAbility` y se resuelve la habilidad disponible.
+- Las habilidades ahora usan efectos reutilizables (`drawCards`, `discardCards`, `banishFromCastle`, `counterTopCard`, etc.) para que nuevas cartas combinen piezas de reglas sin escribir una función completa por carta.
+- También existe una cola de efectos retrasados para reutilizar disparos de timing como **Fase Final**, por ejemplo desterrar una carta al cierre del turno.

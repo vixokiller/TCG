@@ -22,6 +22,7 @@ import {
   returnAllyToHand,
   shuffleAllyIntoCastle,
   startGameWithSelectedDeck,
+  activateCardAbility,
 } from '../src/game.js';
 
 
@@ -153,6 +154,23 @@ test('combined abilities are all functional in gameplay', () => {
 });
 
 
+
+
+
+test('activated abilities can be activated from permanents using reusable effects', () => {
+  const state = createGame();
+  const player = state.players[0];
+  const paidBefore = player.paidGold.length;
+  player.gold.push({ id: 'gold-activate', name: 'Oro', type: CARD_TYPES.ORO });
+  player.supportLine.push({ id: 'perm-activate', name: 'Fuente de Saber', type: CARD_TYPES.TOTEM, cost: 1, ability: 'payOneDrawOne' });
+  const handBefore = player.hand.length;
+
+  const result = activateCardAbility(state, 0, 'supportLine', 0);
+
+  assert.match(result, /activó/);
+  assert.equal(player.hand.length, handBefore + 1);
+  assert.equal(player.paidGold.length, paidBefore + 1);
+});
 
 test('selected user deck starts a match even with fewer than 50 cards', () => {
   const state = createGame();

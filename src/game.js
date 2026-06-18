@@ -87,6 +87,51 @@ function abilityKind(card) {
   const kinds = [...new Set(getAbilities(card).map((ability) => abilityKinds[ability] || 'activada'))];
   return kinds.length ? kinds.join(' + ') : '—';
 }
+
+const activatedAbilities = new Set(['drawTwo', 'banishTwoFromCastle', 'payOneDrawOne', 'darkAwakening', 'animateGoldsUntilFinal', 'shuffleNonGoldPermanent', 'stealAllyUntilEnd']);
+function hasActivatedAbility(card) { return getAbilities(card).some((ability) => activatedAbilities.has(ability)); }
+
+const abilityEffects = {
+  drawCards: ({ player }, amount = 1) => draw(player, amount),
+  discardCards: ({ player }, amount = 1) => { for (let i = 0; i < amount && player.hand.length; i += 1) player.discard.push(player.hand.pop()); },
+  banishFromCastle: ({ opponent }, amount = 1) => opponent.banished.push(...opponent.deck.splice(0, amount)),
+  recycleFromCemetery: ({ player }, amount = 2) => { player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, amount)]); },
+  counterTopCard: ({ state, player, card }) => {
+    const canceled = state.stack.pop();
+    if (!canceled) return 'No hay carta que anular.';
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.discard.push(card);
+    state.responsePrompt = null;
+    return `${player.name} anuló ${canceled.card.name}.`;
+  },
+  banishSelfCounterTopCard: ({ state, player, card }) => {
+    const canceled = state.stack.pop();
+    if (!canceled) return 'No hay carta que anular.';
+    state.players[canceled.playerIndex].discard.push(canceled.card);
+    player.banished.push(card);
+    state.responsePrompt = null;
+    return `${player.name} desterró ${card.name} para anular ${canceled.card.name}.`;
+  },
+  scheduleFinalBanish: ({ state, playerIndex, cardId }) => state.delayedEffects.push({ timing: 'Fase Final', effect: 'banishPermanent', playerIndex, cardId }),
+};
+
+function resolveReusableEffect(state, playerIndex, source, effect, amount = 1) {
+  const player = state.players[playerIndex];
+  const opponent = state.players[1 - playerIndex];
+  return abilityEffects[effect]?.({ state, player, opponent, card: source, playerIndex }, amount);
+}
+
+const activatedAbilityEffects = {
+  drawTwo: [['drawCards', 2]],
+  payOneDrawOne: [['drawCards', 1]],
+  darkAwakening: [['drawCards', 3], ['discardCards', 1]],
+  banishTwoFromCastle: [['banishFromCastle', 2]],
+};
+
+function queueReusableAbility(state, playerIndex, source, ability, kind) {
+  const effects = activatedAbilityEffects[ability] || [];
+  effects.forEach(([effect, amount]) => queueAbility(state, playerIndex, source, ability, kind, () => resolveReusableEffect(state, playerIndex, source, effect, amount)));
+}
 function shuffleDeck(cards) {
   const shuffled = [...cards];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
@@ -238,7 +283,7 @@ function resolveStackEntry(state, entry) {
   if (card.type === CARD_TYPES.ALIADO) {
     player.defenseLine.push({ ...card, exhausted: false, bonus: 0, weapon: null, enteredTurn: state.turn });
     if (hasAbility(card, 'drawOnEnter')) queueAbility(state, playerIndex, card, 'drawOnEnter', 'disparada', () => draw(player, 1));
-    if (hasAbility(card, 'recycleOnEnter')) queueAbility(state, playerIndex, card, 'recycleOnEnter', 'disparada', () => { player.deck = shuffleDeck([...player.deck, ...player.discard.splice(0, 2)]); });
+    if (hasAbility(card, 'recycleOnEnter')) queueAbility(state, playerIndex, card, 'recycleOnEnter', 'disparada', () => resolveReusableEffect(state, playerIndex, card, 'recycleFromCemetery', 2));
     resolveAbilities(state);
     return `${player.name} invocó a ${card.name} en Línea de Defensa.`;
   }
@@ -262,10 +307,7 @@ function resolveStackEntry(state, entry) {
   }
   if (card.type === CARD_TYPES.TALISMAN) {
     player.discard.push(card);
-    if (hasAbility(card, 'drawTwo')) queueAbility(state, playerIndex, card, 'drawTwo', 'activada', () => draw(player, 2));
-    if (hasAbility(card, 'payOneDrawOne')) queueAbility(state, playerIndex, card, 'payOneDrawOne', 'activada', () => draw(player, 1));
-    if (hasAbility(card, 'darkAwakening')) queueAbility(state, playerIndex, card, 'darkAwakening', 'activada', () => { draw(player, 3); if (player.hand.length) player.discard.push(player.hand.pop()); });
-    if (hasAbility(card, 'banishTwoFromCastle')) queueAbility(state, playerIndex, card, 'banishTwoFromCastle', 'activada', () => opponent.banished.push(...opponent.deck.splice(0, 2)));
+    getAbilities(card).filter((ability) => activatedAbilityEffects[ability]).forEach((ability) => queueReusableAbility(state, playerIndex, card, ability, 'activada'));
     resolveAbilities(state);
     checkWinner(state);
     return `${player.name} resolvió ${card.name}.`;
@@ -307,11 +349,7 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
     if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
     payCost(player, card.cost);
     player.hand.splice(handIndex, 1);
-    const canceled = state.stack.pop();
-    state.players[canceled.playerIndex].discard.push(canceled.card);
-    player.banished.push(card);
-    state.responsePrompt = null;
-    return `${player.name} desterró ${card.name} para anular ${canceled.card.name}.`;
+    return resolveReusableEffect(state, playerIndex, card, 'banishSelfCounterTopCard');
   }
 
   if (hasAbility(card, 'morirDePieCounter')) {
@@ -346,11 +384,7 @@ export function playCard(state, playerIndex, handIndex, target = {}) {
     if (availableGold(player) < card.cost) return `Necesitas ${card.cost} Oro disponible.`;
     payCost(player, card.cost);
     player.hand.splice(handIndex, 1);
-    const canceled = state.stack.pop();
-    state.players[canceled.playerIndex].discard.push(canceled.card);
-    player.discard.push(card);
-    state.responsePrompt = null;
-    return `${player.name} anuló ${canceled.card.name}.`;
+    return resolveReusableEffect(state, playerIndex, card, 'counterTopCard');
   }
 
   if (hasAbility(card, 'cancelAbility')) {
@@ -442,6 +476,17 @@ function automaticGrouping(state) {
 }
 function automaticFinal(state) {
   const player = state.players[state.currentPlayer];
+  const finalEffects = state.delayedEffects.filter((effect) => effect.timing === 'Fase Final');
+  state.delayedEffects = state.delayedEffects.filter((effect) => effect.timing !== 'Fase Final');
+  finalEffects.forEach((effect) => {
+    if (effect.effect === 'banishPermanent') {
+      const owner = state.players[effect.playerIndex];
+      for (const line of ['attackLine', 'defenseLine', 'supportLine']) {
+        const index = owner[line].findIndex((card) => card.id === effect.cardId);
+        if (index >= 0) owner.banished.push(...owner[line].splice(index, 1));
+      }
+    }
+  });
   const regroupable = player.paidGold.filter((gold) => hasAbility(gold, 'finalGroupGold'));
   if (regroupable.length) {
     player.paidGold = player.paidGold.filter((gold) => !hasAbility(gold, 'finalGroupGold'));
@@ -525,6 +570,7 @@ function resetMatchState(state, playerDeck = null) {
   state.abilityStack = [];
   state.responsePrompt = null;
   state.pendingWeaponHandIndex = null;
+  state.delayedEffects = [];
   automaticGrouping(state);
   return state;
 }
@@ -541,16 +587,39 @@ export function startGameWithSelectedDeck(state) {
 export function createGame() {
   const saved = loadSavedLibrary();
   const baseDeck = { id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' };
-  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base', stack: [], abilityStack: [], responsePrompt: null, responseTimer: null, pendingWeaponHandIndex: null };
+  const state = { players: [createPlayer('Jugador'), createPlayer('Rival')], currentPlayer: 0, turn: 1, phase: 'Vigilia', log: ['Agrupación inicial automática. Comienza la Vigilia.'], winner: null, loser: null, pendingAttacks: [], talismanPriority: null, talismanPasses: 0, selectedBlockerIndex: null, viewedZone: null, previewCard: null, previewTimer: null, draggingAlly: null, currentTab: 'game', cardCatalog: [...cardPool, ...saved.customCards], decks: [baseDeck, ...saved.userDecks], selectedDeckId: saved.userDecks[0]?.id || 'base', stack: [], abilityStack: [], responsePrompt: null, responseTimer: null, pendingWeaponHandIndex: null, delayedEffects: [] };
   automaticGrouping(state);
   return state;
+}
+
+
+function lineFromZone(zone) {
+  if (zone.includes('ataque')) return 'attackLine';
+  if (zone.includes('defensa')) return 'defenseLine';
+  if (zone.includes('apoyo')) return 'supportLine';
+  return null;
+}
+
+export function activateCardAbility(state, playerIndex, line, index) {
+  const player = state.players[playerIndex];
+  const card = player?.[line]?.[index];
+  if (!card) return 'No hay carta para activar.';
+  const ability = getAbilities(card).find((item) => activatedAbilityEffects[item]);
+  if (!ability) return `${card.name} no tiene habilidad activada disponible.`;
+  if (ability === 'payOneDrawOne') {
+    if (availableGold(player) < 1) return 'Necesitas 1 Oro disponible para activar esta habilidad.';
+    payCost(player, 1);
+  }
+  queueReusableAbility(state, playerIndex, card, ability, 'activada');
+  resolveAbilities(state);
+  return `${player.name} activó ${card.name}.`;
 }
 
 function renderCard(card, index, zone, onClick, state = null) {
   const button = document.createElement('button');
   const imageHtml = card.imageUrl ? `<img class="card-art" src="${card.imageUrl}" alt="${card.name}">` : `<div class="card-art missing-art" aria-label="${card.name}">${card.name}</div>`;
   button.className = `card image-only ${card.type.toLowerCase()} ${card.imageUrl ? 'has-art' : 'no-art'} ${card.exhausted ? 'exhausted' : ''} ${card.weapon ? 'armed' : ''} ${state?.pendingWeaponHandIndex !== null && (zone === 'defensa' || zone === 'ataque') ? 'weapon-target' : ''}`;
-  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}`;
+  button.innerHTML = `${card.weapon ? `<div class="attached-weapon">${card.weapon.name}</div>` : ''}${imageHtml}${hasActivatedAbility(card) && !zone.includes('rival') && !zone.includes('mano') && !zone.includes('catalogo') && !zone.includes('mazo') ? '<span class="activate-ability">Activar</span>' : ''}`;
   button.title = zone;
   button.disabled = zone.includes('mazo') || zone.includes('cementerio') || zone.includes('destierro') || zone.includes('oro');
   if (zone === 'defensa' || zone === 'ataque') {
@@ -561,7 +630,14 @@ function renderCard(card, index, zone, onClick, state = null) {
     button.addEventListener('mouseenter', () => { state.previewTimer = setTimeout(() => { state.previewCard = card; render(state); }, 2000); });
     button.addEventListener('mouseleave', () => { clearTimeout(state.previewTimer); state.previewCard = null; render(state); });
   }
-  button.addEventListener('click', () => onClick(index));
+  button.addEventListener('click', (event) => {
+    if (event.target.closest('.activate-ability') && state) {
+      event.stopPropagation();
+      const line = lineFromZone(zone);
+      if (line) { state.log.push(activateCardAbility(state, zone.includes('rival') ? 1 : 0, line, index)); render(state); return; }
+    }
+    onClick(index);
+  });
   return button;
 }
 
@@ -693,11 +769,13 @@ function render(state) {
   renderZone('#rivalDefense', rival.defenseLine.map((card) => ({ ...card, effectiveStrength: totalStrength(rival, card, 'defenseLine') })), 'defensa rival', (i) => { if (state.phase === 'Declaración de Bloqueadores') { state.selectedBlockerIndex = i; state.log.push(`${rival.defenseLine[i].name} seleccionado para bloquear.`); render(state); } }, state);
   renderZone('#rivalSupport', rival.supportLine, 'apoyo rival', () => {}, state);
   renderZone('#playerAttack', player.attackLine.map((card) => ({ ...card, effectiveStrength: totalStrength(player, card, 'attackLine') })), 'ataque', (i) => {
-    if (state.pendingWeaponHandIndex !== null) { state.log.push(playCard(state, 0, state.pendingWeaponHandIndex, { allyIndex: i })); state.pendingWeaponHandIndex = null; render(state); return; }
+    if (state.pendingWeaponHandIndex !== null) { state.log.push(playCard(state, 0, state.pendingWeaponHandIndex, { allyIndex: i })); state.pendingWeaponHandIndex = null;
+  state.delayedEffects = []; render(state); return; }
     if (state.phase === 'Declaración de Bloqueadores' && state.selectedBlockerIndex !== null) { state.log.push(declareBlocker(state, state.selectedBlockerIndex, i)); state.selectedBlockerIndex = null; render(state); }
   }, state);
   renderZone('#playerDefense', player.defenseLine.map((card) => ({ ...card, effectiveStrength: totalStrength(player, card, 'defenseLine') })), 'defensa', (i) => {
-    if (state.pendingWeaponHandIndex !== null) { state.log.push(playCard(state, 0, state.pendingWeaponHandIndex, { allyIndex: player.attackLine.length + i })); state.pendingWeaponHandIndex = null; render(state); return; }
+    if (state.pendingWeaponHandIndex !== null) { state.log.push(playCard(state, 0, state.pendingWeaponHandIndex, { allyIndex: player.attackLine.length + i })); state.pendingWeaponHandIndex = null;
+  state.delayedEffects = []; render(state); return; }
     if (state.phase === 'Declaración de Bloqueadores' && state.currentPlayer === 1) { state.selectedBlockerIndex = i; state.log.push(`${player.defenseLine[i].name} seleccionado para bloquear.`); render(state); return; }
     if (state.currentPlayer === 0 && state.phase === 'Vigilia') state.log.push(moveAllyToAttack(player, i, state)); render(state);
   }, state);
