@@ -103,15 +103,17 @@ export function countByType(deck) {
   return deck.reduce((counts, card) => ({ ...counts, [card.type]: (counts[card.type] || 0) + 1 }), {});
 }
 
-export function createPlayer(name) {
-  const deck = buildDeck();
+function cloneDeckForGame(cards) { return cards.map((card, index) => clone(card, `${card.code || card.id || card.name}-game-${Date.now()}-${index}`)); }
+
+export function createPlayer(name, deckOverride = null) {
+  const deck = deckOverride ? balancedShuffle(cloneDeckForGame(deckOverride)) : buildDeck();
   const startingGold = [];
   while (startingGold.length < STARTING_GOLD) {
     const goldIndex = deck.findIndex((card) => card.type === CARD_TYPES.ORO);
     if (goldIndex < 0) break;
     startingGold.push({ ...deck.splice(goldIndex, 1)[0], paid: false, initial: true });
   }
-  return { name, deck, hand: deck.splice(0, STARTING_HAND_SIZE), gold: startingGold, paidGold: [], defenseLine: [], attackLine: [], supportLine: [], discard: [], banished: [], playedGold: false, damageThisTurn: 0 };
+  return { name, deck, hand: deck.splice(0, Math.min(STARTING_HAND_SIZE, deck.length)), gold: startingGold, paidGold: [], defenseLine: [], attackLine: [], supportLine: [], discard: [], banished: [], playedGold: false, damageThisTurn: 0 };
 }
 
 export function availableGold(player) { return player.gold.length; }
@@ -440,6 +442,36 @@ export function advancePhase(state) {
   return state.phase;
 }
 
+function resetMatchState(state, playerDeck = null) {
+  state.players = [createPlayer('Jugador', playerDeck), createPlayer('Rival')];
+  state.currentPlayer = 0;
+  state.turn = 1;
+  state.phase = 'Vigilia';
+  state.log = ['Nueva partida iniciada con el mazo seleccionado.'];
+  state.winner = null;
+  state.loser = null;
+  state.pendingAttacks = [];
+  state.talismanPriority = null;
+  state.talismanPasses = 0;
+  state.selectedBlockerIndex = null;
+  state.viewedZone = null;
+  state.stack = [];
+  state.abilityStack = [];
+  state.responsePrompt = null;
+  state.pendingWeaponHandIndex = null;
+  automaticGrouping(state);
+  return state;
+}
+
+export function startGameWithSelectedDeck(state) {
+  const deck = selectedDeck(state);
+  const selectedCards = deck?.cards?.length ? deck.cards : null;
+  resetMatchState(state, selectedCards);
+  state.log.push(selectedCards ? `Probando ${deck.name} con ${selectedCards.length} carta(s).` : 'El mazo seleccionado está vacío; se usó el mazo base.');
+  state.currentTab = 'game';
+  return state;
+}
+
 export function createGame() {
   const saved = loadSavedLibrary();
   const baseDeck = { id: 'base', name: 'Austral Base', cards: buildDeck(), source: 'computer' };
@@ -506,10 +538,11 @@ function renderViewedZone(state, active, opponent) {
 function selectedDeck(state) { return state.decks.find((deck) => deck.id === state.selectedDeckId); }
 function renderDeckBuilder(state) {
   const deck = selectedDeck(state);
-  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option><option value="counterCard">Anular carta</option><option value="cancelAbility">Cancelar habilidad</option><option value="finalGroupGold">Oro: agrupar en Final</option></select><label><input name="unique" type="checkbox"> Carta Única</label><input name="copyLimit" type="number" min="1" value="3" placeholder="Máximo de copias"><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><p class="deck-errors">${validateDeckCopies(deck?.cards || []).join(' ')}</p><div id="deckCards" class="zone compact"></div></article></section></main>`;
+  return `<main class="shell"><header><div><p class="eyebrow">Constructor</p><h1>Biblioteca Austral</h1><p class="phase">Mazo seleccionado: <b>${deck?.name || 'Ninguno'}</b></p></div><button id="tabGame">Ir al juego</button><button id="testDeck">Probar mazo seleccionado</button></header><section class="builder-grid"><article class="builder-panel"><h2>Mazos</h2><div id="deckList"></div><button id="newDeck">Crear mazo vacío</button><p>Debes seleccionar un mazo para jugar. Hay mazos pre diseñados y mazos creados por el usuario.</p></article><article class="builder-panel"><h2>Enciclopedia de cartas</h2><div id="catalog" class="zone"></div></article><article class="builder-panel"><h2>Crear carta</h2><form id="cardForm"><input name="name" placeholder="Nombre" required><select name="type"><option>Aliado</option><option>Oro</option><option>Talismán</option><option>Tótem</option><option>Arma</option></select><input name="cost" type="number" min="0" value="1"><input name="strength" type="number" min="0" value="1"><input name="race" placeholder="Raza"><select name="ability"><option value="">Sin habilidad funcional</option><option value="drawOnEnter">Entrada: roba 1</option><option value="drawTwo">Roba 2</option><option value="haste">Ímpetu</option><option value="recycleOnEnter">Recicla 2 del Cementerio</option><option value="banishOnHit">Destierra al impactar</option><option value="raceGuardian">Bonifica raza en defensa</option><option value="counterCard">Anular carta</option><option value="cancelAbility">Cancelar habilidad</option><option value="finalGroupGold">Oro: agrupar en Final</option></select><label><input name="unique" type="checkbox"> Carta Única</label><input name="copyLimit" type="number" min="1" value="3" placeholder="Máximo de copias"><input name="rarity" placeholder="Rareza" value="Común"><input name="edition" placeholder="Edición" value="Usuario"><input name="product" placeholder="Producto" value="Carta creada"><input name="imageUrl" placeholder="URL de imagen opcional"><input name="text" placeholder="Texto / habilidad"><button>Crear carta</button></form><h2>Cartas del mazo</h2><p class="deck-errors">${validateDeckCopies(deck?.cards || []).join(' ')}</p><div id="deckCards" class="zone compact"></div></article></section></main>`;
 }
 function wireDeckBuilder(state) {
   document.querySelector('#tabGame')?.addEventListener('click', () => { state.currentTab = 'game'; render(state); });
+  document.querySelector('#testDeck')?.addEventListener('click', () => { startGameWithSelectedDeck(state); render(state); });
   const deckList = document.querySelector('#deckList');
   state.decks.forEach((deck) => {
     const button = document.createElement('button');

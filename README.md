@@ -105,3 +105,8 @@ npm start
 - Una carta puede definir `ability` como arreglo, por ejemplo `['haste', 'drawOnEnter', 'banishOnHit']`, para combinar varias habilidades funcionales.
 - Si no defines `ability`, `createCardRecord` intenta inferir habilidades soportadas desde el texto de la carta, lo que permite ingresar cartas por código sin duplicar la lógica.
 - Se mantienen las cartas agregadas `Dragón Dorado` y `Gaitas` en la base de datos; sus textos se transforman en habilidades combinadas funcionales.
+
+## Probar mazos personalizados
+
+- En el Constructor, selecciona un mazo y pulsa **Probar mazo seleccionado** para iniciar una partida nueva usando exactamente esas cartas en el Mazo Castillo del Jugador.
+- Para facilitar pruebas de cartas y habilidades, los mazos personalizados pueden tener menos de 50 cartas; el juego robará la mano inicial posible y no reemplazará automáticamente el mazo por el mazo base salvo que el mazo seleccionado esté vacío.

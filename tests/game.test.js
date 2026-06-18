@@ -21,6 +21,7 @@ import {
   playCard,
   returnAllyToHand,
   shuffleAllyIntoCastle,
+  startGameWithSelectedDeck,
 } from '../src/game.js';
 
 
@@ -122,6 +123,26 @@ test('combined abilities are all functional in gameplay', () => {
   assert.match(playCard(state, 0, 0), /Dragón Dorado/);
   assert.equal(player.hand.length, handBefore); // salió el Dragón y robó 1 carta.
   assert.match(moveAllyToAttack(player, 0, state), /Línea de Ataque/);
+});
+
+
+
+test('selected user deck starts a match even with fewer than 50 cards', () => {
+  const state = createGame();
+  const tinyDeck = [
+    { id: 'tiny-gold', code: 'tiny-gold', name: 'Oro Test', type: CARD_TYPES.ORO },
+    { id: 'tiny-ally', code: 'tiny-ally', name: 'Aliado Test', type: CARD_TYPES.ALIADO, cost: 1, strength: 2 },
+    { id: 'tiny-talisman', code: 'tiny-talisman', name: 'Talismán Test', type: CARD_TYPES.TALISMAN, cost: 0, ability: 'drawTwo' },
+  ];
+  state.decks.push({ id: 'tiny', name: 'Mazo mínimo', cards: tinyDeck, source: 'user' });
+  state.selectedDeckId = 'tiny';
+
+  startGameWithSelectedDeck(state);
+
+  assert.equal(state.players[0].gold.length, 1);
+  assert.equal(state.players[0].hand.length, 2);
+  assert.equal(state.players[0].deck.length, 0);
+  assert.match(state.log.join(' '), /Mazo mínimo con 3 carta/);
 });
 
 test('standard castle deck has 50 cards with requested type composition', () => {
