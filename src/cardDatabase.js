@@ -35,6 +35,8 @@ export const CARD_DATABASE = [
   createCardRecord({ code: 'BA-TOT-001', name: 'Tótem del Foye', cost: 2, type: 'Tótem', ability: 'foyeDefenseBuff', text: 'Continuo: tus Aliados en Línea de Defensa tienen +1 fuerza.', rarity: 'Infrecuente' }),
   createCardRecord({ code: 'BA-TOT-002', name: 'Tótem de la Machi', cost: 3, type: 'Tótem', ability: 'machiExtraDraw', text: 'Continuo: en Robo, roba 1 carta adicional.', rarity: 'Rara' }),
   createCardRecord({ code: 'BA-ARM-001', name: 'Lanza de Colihue', cost: 1, strength: 2, type: 'Arma', ability: 'weaponBuff', text: 'Anexar: el Aliado portador obtiene +2 fuerza.', rarity: 'Común' }),
+  createCardRecord({ code: 'TK1-01-13', name: 'Dragón Dorado', image: '/assets/cards/Toolkit 2022: Red de Plata/Dragon-dorado-rework-rework.webp-1762835071291', cost: 0, type: 'Talismán', text: 'Cuando juegues Dragón Dorado, destiérralo. Dragón Dorado puede ser jugado en cualquier momento para anular una carta. Carta Unica.', rarity: 'Rework', edition: 'Espada Sagrada', product: 'Toolkit 2022: Red de Plata', unique: true, copyLimit: 1 }),
+  createCardRecord({ code: 'TK1-02-13', name: 'Gaitas', image: '/assets/cards/Toolkit 2022: Red de Plata/Gaitas-promocional.webp-1762835190253', type: 'Oro', text: 'En la Fase Final puedes agrupar este Oro', rarity: 'Real', edition: 'Hijos de Daana', product: 'Toolkit 2022: Red de Plata', copyLimit: 3 }),
 ];
 
 export function toPlayableCard(record) {
